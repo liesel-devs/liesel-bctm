@@ -7,7 +7,12 @@ format: gfm
 
 `bctm` is a Python library for building Bayesian Conditional
 Transformation Models and sampling from their parameter's posterior distribution
-via MCMC. It is built on top of the probabilistic programming framework [Liesel](https://docs.liesel-project.org/en/latest/).
+via MCMC. It is built on top of the probabilistic programming framework.
+
+For more on Liesel, see
+
+- [The Liesel documentation](https://docs.liesel-project.org/en/latest/)
+- [The Liesel GitHub repository](https://github.com/liesel-devs/liesel)
 
 For more on Bayesian Conditional Transformation Models, see
 
