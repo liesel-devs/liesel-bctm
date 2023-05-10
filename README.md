@@ -210,7 +210,7 @@ library(tidyverse)
     ✔ tibble  3.1.7     ✔ dplyr   1.0.9
     ✔ tidyr   1.2.0     ✔ stringr 1.5.0
     ✔ readr   2.1.2     ✔ forcats 0.5.1
-    ✔ purrr   1.0.1     
+    ✔ purrr   1.0.1
 
     ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
     ✖ dplyr::filter() masks stats::filter()
