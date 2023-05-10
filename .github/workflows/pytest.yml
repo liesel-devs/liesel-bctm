@@ -1,0 +1,54 @@
+name: pytest
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install liesel
+        run: pip install git+https://github.com/liesel-devs/liesel.git
+
+      - name: Install liesel-internal
+        run: |
+          pip install git+https://jobrachem:${{ secrets.ACCESS_LIESEL_INTERNAL }}@github.com/liesel-devs/liesel-internal.git@v0.2.2
+
+      - name: Install package
+        run: |
+          pip install .[dev]
+          pip list
+
+      - name: Run pytest
+        run: pytest --cov=bctm --run-mcmc
+
+      - name: Create coverage badge
+        uses: tj-actions/coverage-badge-py@v1.8
+        with:
+          output: tests/coverage.svg
+          overwrite: true
+
+      - name: Commit coverage.svg
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git ls-remote | grep refs/heads/pytest-cov && git remote set-branches --add origin pytest-cov && git fetch
+          git add tests/coverage.svg
+          git diff --staged --quiet || git commit -m "Updated coverage.svg"
+
+      - name: Push coverage.svg
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}

@@ -1,0 +1,34 @@
+name: pytest
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install liesel
+        run: pip install git+https://github.com/liesel-devs/liesel.git
+
+      - name: Install liesel-internal
+        run: |
+          pip install git+https://jobrachem:${{ secrets.ACCESS_LIESEL_INTERNAL }}@github.com/liesel-devs/liesel-internal.git@v0.2.2
+
+      - name: Install package
+        run: |
+          pip install .[dev]
+          pip list
+
+      - name: Run pytest
+        run: pytest --run-mcmc

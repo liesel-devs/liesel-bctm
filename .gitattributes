@@ -1,0 +1,3 @@
+*.html linguist-detectable=false
+*.htm inguist-detectable=false
+*.ipynb inguist-detectable=false
