@@ -31,7 +31,7 @@ jobs:
           pip list
 
       - name: Run pytest
-        run: pytest --cov=bctm --run-mcmc
+        run: pytest --cov=liesel_bctm --run-mcmc
 
       - name: Create coverage badge
         uses: tj-actions/coverage-badge-py@v1.8
