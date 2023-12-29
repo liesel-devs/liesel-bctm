@@ -641,14 +641,11 @@ def ctm_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
     builder.set_model(GooseModel(model))
     builder.set_initial_values(model.state)
 
-    nuts_params = []
-
     for group in model.groups().values():
         for kernel in group.gibbs_kernels():
             builder.add_kernel(kernel)
 
-        nuts_params += group.sampled_params
-
-    builder.add_kernel(NUTSKernel(nuts_params))
+        if group.sampled_params:
+            builder.add_kernel(NUTSKernel(group.sampled_params))
 
     return builder
