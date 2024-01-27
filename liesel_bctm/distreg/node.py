@@ -1,13 +1,11 @@
 import jax.numpy as jnp
-from liesel_bctm.custom_types import Array
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
-from liesel.model import Calc, Dist
-from liesel.model import Group as LieselGroup
-from liesel.model import Obs, Param, Var, obs, param
-from liesel.model.nodes import Data, Dist, Calc, Node
 from liesel.distributions import MultivariateNormalDegenerate
 from liesel.goose import NUTSKernel
+from liesel.model import Group as LieselGroup
+from liesel.model import Obs, Param, Var, obs, param
+from liesel.model.nodes import Calc, Data, Dist, Node
 from sklearn.preprocessing import LabelBinarizer
 
 from ..custom_types import Array, Kernel
@@ -151,9 +149,7 @@ class LinConst(Group):
 
         self.sampled_params = [self.coef.name]
 
-        super().__init__(
-            name, x=self.x, coef=self.coef, smooth=self.smooth
-        )
+        super().__init__(name, x=self.x, coef=self.coef, smooth=self.smooth)
 
     def ppeval(self, samples: dict, x: Array | None = None) -> Array:
         """
@@ -186,7 +182,6 @@ def find_param(var: Var) -> Var | None:
     return find_param(value_var)
 
 
-
 def _matrix(x: Array) -> Array:
     if not np.shape(x):
         x = np.atleast_2d(x)
@@ -198,8 +193,10 @@ def _matrix(x: Array) -> Array:
         raise ValueError(f"Shape of x is unsupported: {np.shape(x)}")
     return x
 
+
 def scaled_dot(x: Array, coef: Array, scale: Array):
     return x @ (scale * coef)
+
 
 class ScaledDot(Calc):
     def __init__(
@@ -218,15 +215,15 @@ class ScaledDot(Calc):
     def predict(self, samples: dict[str, Array], x: Array | None = None) -> Array:
         if not self.coef.strong:
             raise ValueError("To use predict(), coef must be a strong node.")
-        
+
         coef_samples = samples[self.coef.name]
         coef_samples = np.atleast_3d(coef_samples)
-        
+
         scale_samples = self.scale.predict(samples)
         scale_samples = np.atleast_3d(scale_samples)
 
         scaled_coef_samples = scale_samples * coef_samples
-        
+
         x = x if x is not None else self.x.value
         smooth = np.tensordot(_matrix(x), scaled_coef_samples, axes=([1], [-1]))
         return np.moveaxis(smooth, 0, -1)
@@ -236,6 +233,7 @@ class RandomIntercept(Lin):
     """
     A random intercept with iid normal prior in noncentered parameterization.
     """
+
     def __init__(self, x: Array, tau: Var, name: str) -> None:
         self.label_binarizer = LabelBinarizer()
         self.label_binarizer.fit(x)
@@ -250,12 +248,10 @@ class RandomIntercept(Lin):
         )
 
         self.smooth = Var(
-            ScaledDot(
-                x=self.basis, coef=self.coef, scale=self.tau
-            ),
+            ScaledDot(x=self.basis, coef=self.coef, scale=self.tau),
             name=f"{name}_smooth",
         )
-        
+
         tau_param = find_param(self.tau)
         self._hyper_parameters: list[str] = []
         if tau_param is not None:
@@ -263,7 +259,6 @@ class RandomIntercept(Lin):
 
         self._parameters: list[str] = [self.coef.name]
 
-        
         super(Lin, self).__init__(
             name=name,
             smooth=self.smooth,
@@ -272,18 +267,17 @@ class RandomIntercept(Lin):
             coef=self.coef,
             tau=self.tau,
         )
-        
+
         self._default_kernel = NUTSKernel
         self.mcmc_kernels: list[Kernel] = self._default_kernels()
-    
+
     @property
     def hyper_parameters(self):
         return self._hyper_parameters
-    
+
     @property
     def parameters(self):
         return self._parameters
-
 
     def _default_kernels(self) -> list[Kernel]:
         kernels: list[Kernel] = []
@@ -298,19 +292,19 @@ class RandomIntercept(Lin):
             kernels.append(NUTSKernel([tau_param.name]))
 
         return kernels
-    
+
     def ppeval(self, samples: dict, x: Array | None = None) -> Array:
 
         coef_samples = samples[self.coef.name]
         coef_samples = np.atleast_3d(coef_samples)
-        
+
         scale_samples = self.tau.predict(samples)
         scale_samples = np.atleast_3d(scale_samples)
 
         scaled_coef_samples = scale_samples * coef_samples
 
         X = self.basis_fn(x)
-        
+
         smooth = np.tensordot(X, scaled_coef_samples, axes=([1], [-1]))
         return np.moveaxis(smooth, 0, -1)
 
@@ -321,8 +315,8 @@ def sumzero(nparam: int) -> Array:
     q, _ = np.linalg.qr(j, mode="complete")
     return q[:, 1:]
 
-class RandomInterceptSumZero(RandomIntercept):
 
+class RandomInterceptSumZero(RandomIntercept):
     def __init__(self, x: Array, tau: Var, name: str) -> None:
         self.label_binarizer = LabelBinarizer()
         self.label_binarizer.fit(x)
@@ -376,4 +370,3 @@ class RandomInterceptSumZero(RandomIntercept):
 
         self._default_kernel = NUTSKernel
         self.mcmc_kernels: list[Kernel] = self._default_kernels()
-

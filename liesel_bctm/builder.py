@@ -160,7 +160,7 @@ class CTMBuilder(LieselDistRegBuilder):
         self.pt.append(lin)
         self.add_groups(lin)
         return self
-    
+
     def add_linear_const(
         self,
         *x: Array | str,
@@ -188,7 +188,7 @@ class CTMBuilder(LieselDistRegBuilder):
         self.pt.append(lin)
         self.add_groups(lin)
         return self
-    
+
     def add_random_intercept(
         self,
         x: Array | str,
@@ -737,7 +737,7 @@ def ctm_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
 
         if group.sampled_params:
             builder.add_kernel(NUTSKernel(group.sampled_params))
-        
+
         if hasattr(group, "mcmc_kernels"):
             for kernel in group.mcmc_kernels:
                 builder.add_kernel(kernel)
