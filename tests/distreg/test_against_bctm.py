@@ -2,7 +2,7 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from liesel_internal.experimental import splines
+from liesel_internal import splines
 
 from liesel_bctm.distreg import constraints
 from liesel_bctm.distreg import mi_splines as mi
