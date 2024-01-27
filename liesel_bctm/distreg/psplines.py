@@ -10,8 +10,8 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.distributions import MultivariateNormalDegenerate
 from liesel.goose import GibbsKernel
 from liesel.model import Calc, Data, Dist, Param, Var
-from liesel_internal.experimental import splines
-from liesel_internal.experimental.lookup import LookUp, LookUpCalculator
+from liesel_internal import splines
+from liesel_internal.lookup import LookUp, LookUpCalculator
 
 from ..custom_types import Array
 from . import constraints, gibbs
