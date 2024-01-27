@@ -189,6 +189,67 @@ class CTMBuilder(LieselDistRegBuilder):
         self.add_groups(lin)
         return self
     
+    def add_random_intercept(
+        self,
+        x: Array | str,
+        tau: Var,
+        name: str | None = None,
+    ) -> CTMBuilder:
+        """
+        Adds a parametric smooth to the model builder.
+
+
+        Parameters
+        ----------
+        x
+            Covariate. Either arrays or strings, indicating the name of
+            covariate arrays in :attr:`.data`.
+        tau
+            Prior scale for the random effects.
+        name
+            You can give a convenient name to this smooth. Allows you to retrieve the
+            smooth group object from the :meth:`.GraphBuilder.groups` and
+            :meth:`.Model.groups` by an easily identiable name. The smooth name will
+            also be used as prefix for all :class:`.Var`s in the smooth.
+        """
+        xval = self._array(x)
+        str_name = self._pt_name(name, "random_intercept")
+
+        re = nd.RandomIntercept(xval, tau=tau, name=str_name)
+        self.pt.append(re)
+        self.add_groups(re)
+        return self
+
+    def add_random_intercept_sumzero(
+        self,
+        x: Array | str,
+        tau: Var,
+        name: str | None = None,
+    ) -> CTMBuilder:
+        """
+        Adds a parametric smooth to the model builder.
+
+
+        Parameters
+        ----------
+        x
+            Covariate. Either arrays or strings, indicating the name of
+            covariate arrays in :attr:`.data`.
+        tau
+            Prior scale for the random effects.
+        name
+            You can give a convenient name to this smooth. Allows you to retrieve the
+            smooth group object from the :meth:`.GraphBuilder.groups` and
+            :meth:`.Model.groups` by an easily identiable name. The smooth name will
+            also be used as prefix for all :class:`.Var`s in the smooth.
+        """
+        xval = self._array(x)
+        str_name = self._pt_name(name, "random_intercept")
+
+        re = nd.RandomInterceptSumZero(xval, tau=tau, name=str_name)
+        self.pt.append(re)
+        self.add_groups(re)
+        return self
 
     def add_intercept(self) -> CTMBuilder:
         """Adds a constant term (intercept). Has a constant prior."""
@@ -676,5 +737,9 @@ def ctm_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
 
         if group.sampled_params:
             builder.add_kernel(NUTSKernel(group.sampled_params))
+        
+        if hasattr(group, "mcmc_kernels"):
+            for kernel in group.mcmc_kernels:
+                builder.add_kernel(kernel)
 
     return builder

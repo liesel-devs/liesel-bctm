@@ -4,7 +4,11 @@ import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.model import Calc, Dist
 from liesel.model import Group as LieselGroup
-from liesel.model import Obs, Param, Var
+from liesel.model import Obs, Param, Var, obs, param
+from liesel.model.nodes import Data, Dist, Calc, Node
+from liesel.distributions import MultivariateNormalDegenerate
+from liesel.goose import NUTSKernel
+from sklearn.preprocessing import LabelBinarizer
 
 from ..custom_types import Array, Kernel
 
@@ -166,4 +170,210 @@ class LinConst(Group):
             X = np.atleast_2d(x).T
         smooth = np.tensordot(X, coef_samples, axes=([1], [-1]))
         return np.moveaxis(smooth, 0, -1)
+
+
+def find_param(var: Var) -> Var | None:
+    if var.parameter:
+        if not var.strong:
+            raise ValueError(f"{var} is marked as a parameter but it is not strong.")
+        return var
+
+    if not var.value_node.inputs:
+        return None
+
+    var_value_node = var.value_node.inputs[0]
+    value_var = var_value_node.inputs[0].var
+    return find_param(value_var)
+
+
+
+def _matrix(x: Array) -> Array:
+    if not np.shape(x):
+        x = np.atleast_2d(x)
+    elif len(np.shape(x)) == 1:
+        x = np.expand_dims(x, axis=1)
+    elif len(np.shape(x)) == 2:
+        pass
+    else:
+        raise ValueError(f"Shape of x is unsupported: {np.shape(x)}")
+    return x
+
+def scaled_dot(x: Array, coef: Array, scale: Array):
+    return x @ (scale * coef)
+
+class ScaledDot(Calc):
+    def __init__(
+        self,
+        x: Var | Node,
+        coef: Var | Node,
+        scale: Var,
+        _name: str = "",
+    ) -> None:
+        super().__init__(scaled_dot, x=x, coef=coef, scale=scale, _name=_name)
+        self.update()
+        self.x = x
+        self.scale = scale
+        self.coef = coef
+
+    def predict(self, samples: dict[str, Array], x: Array | None = None) -> Array:
+        if not self.coef.strong:
+            raise ValueError("To use predict(), coef must be a strong node.")
+        
+        coef_samples = samples[self.coef.name]
+        coef_samples = np.atleast_3d(coef_samples)
+        
+        scale_samples = self.scale.predict(samples)
+        scale_samples = np.atleast_3d(scale_samples)
+
+        scaled_coef_samples = scale_samples * coef_samples
+        
+        x = x if x is not None else self.x.value
+        smooth = np.tensordot(_matrix(x), scaled_coef_samples, axes=([1], [-1]))
+        return np.moveaxis(smooth, 0, -1)
+
+
+class RandomIntercept(Lin):
+    """
+    A random intercept with iid normal prior in noncentered parameterization.
+    """
+    def __init__(self, x: Array, tau: Var, name: str) -> None:
+        self.label_binarizer = LabelBinarizer()
+        self.label_binarizer.fit(x)
+        self.x = obs(x, name=f"{name}_covariate")
+        self.basis_fn = self.label_binarizer.transform
+        self.basis = Data(self.basis_fn(x), _name=f"{name}_basis")
+        self.tau = tau
+
+        prior = Dist(tfd.Normal, loc=0.0, scale=1.0)
+        self.coef = param(
+            np.zeros(self.basis.value.shape[-1]), prior, name=f"{name}_coef"
+        )
+
+        self.smooth = Var(
+            ScaledDot(
+                x=self.basis, coef=self.coef, scale=self.tau
+            ),
+            name=f"{name}_smooth",
+        )
+        
+        tau_param = find_param(self.tau)
+        self._hyper_parameters: list[str] = []
+        if tau_param is not None:
+            self._hyper_parameters.append(tau_param.name)
+
+        self._parameters: list[str] = [self.coef.name]
+
+        
+        super(Lin, self).__init__(
+            name=name,
+            smooth=self.smooth,
+            basis=self.basis,
+            x=self.x,
+            coef=self.coef,
+            tau=self.tau,
+        )
+        
+        self._default_kernel = NUTSKernel
+        self.mcmc_kernels: list[Kernel] = self._default_kernels()
+    
+    @property
+    def hyper_parameters(self):
+        return self._hyper_parameters
+    
+    @property
+    def parameters(self):
+        return self._parameters
+
+
+    def _default_kernels(self) -> list[Kernel]:
+        kernels: list[Kernel] = []
+
+        kernels.append(self._default_kernel([self.coef.name]))
+
+        if not self.hyper_parameters:
+            return kernels
+
+        tau_param = find_param(self.tau)
+        if tau_param is not None:
+            kernels.append(NUTSKernel([tau_param.name]))
+
+        return kernels
+    
+    def ppeval(self, samples: dict, x: Array | None = None) -> Array:
+
+        coef_samples = samples[self.coef.name]
+        coef_samples = np.atleast_3d(coef_samples)
+        
+        scale_samples = self.tau.predict(samples)
+        scale_samples = np.atleast_3d(scale_samples)
+
+        scaled_coef_samples = scale_samples * coef_samples
+
+        X = self.basis_fn(x)
+        
+        smooth = np.tensordot(X, scaled_coef_samples, axes=([1], [-1]))
+        return np.moveaxis(smooth, 0, -1)
+
+
+def sumzero(nparam: int) -> Array:
+    """Matrix "Z" for reparameterization for sum-to-zero-constraint."""
+    j = np.ones(shape=(nparam, 1), dtype=np.float32)
+    q, _ = np.linalg.qr(j, mode="complete")
+    return q[:, 1:]
+
+class RandomInterceptSumZero(RandomIntercept):
+
+    def __init__(self, x: Array, tau: Var, name: str) -> None:
+        self.label_binarizer = LabelBinarizer()
+        self.label_binarizer.fit(x)
+        self.x = obs(x, name=f"{name}_covariate")
+
+        nparam = self.label_binarizer.transform(x).shape[-1]
+        K = jnp.eye(nparam)
+        Z = sumzero(nparam)
+        Kz = Z.T @ K @ Z
+
+        self.basis_fn = lambda x: self.label_binarizer.transform(x) @ Z
+        self.basis = Data(self.basis_fn(x), _name=f"{name}_basis")
+        self.tau = tau
+
+        self.evals = jnp.linalg.eigvalsh(Kz)
+        self.rank = Data(jnp.sum(self.evals > 0.0), _name=f"{name}_K_rank")
+        _log_pdet = jnp.log(jnp.where(self.evals > 0.0, self.evals, 1.0)).sum()
+        self.log_pdet = Data(_log_pdet, _name=f"{name}_K_log_pdet")
+
+        prior = Dist(
+            MultivariateNormalDegenerate.from_penalty,
+            loc=0.0,
+            var=tau,
+            pen=Kz,
+            rank=self.rank,
+            log_pdet=self.log_pdet,
+        )
+
+        self.coef = param(np.zeros(Kz.shape[-1]), prior, name=f"{name}_coef")
+
+        self.smooth = Var(
+            ScaledDot(x=self.basis, coef=self.coef, scale=self.tau),
+            name=f"{name}_smooth",
+        )
+
+        tau_param = find_param(self.tau)
+        self._hyper_parameters: list[str] = []
+        if tau_param is not None:
+            self._hyper_parameters.append(tau_param.name)
+
+        self._parameters: list[str] = [self.coef.name]
+
+        super(Lin, self).__init__(
+            name=name,
+            smooth=self.smooth,
+            basis=self.basis,
+            x=self.x,
+            coef=self.coef,
+            tau=self.tau,
+        )
+
+        self._default_kernel = NUTSKernel
+        self.mcmc_kernels: list[Kernel] = self._default_kernels()
 
