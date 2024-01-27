@@ -227,6 +227,17 @@ def sample_means(
     return summarise_samples(samples, fn=np.mean, axis=axis, suffix=suffix)
 
 
+def array_to_dict(x: Array, names_prefix: str = "x") -> dict[str, Array]:
+    """Turns a 2d-array into a dict."""
+
+    if isinstance(x, float) or x.ndim == 1:
+        return {f"{names_prefix}0": x}
+    elif x.ndim == 2:
+        return {f"{names_prefix}{i}": x[:, i] for i in range(x.shape[-1])}
+    else:
+        raise ValueError(f"x should have ndim <= 2, but it has x.ndim={x.ndim}")
+
+
 def cdist_quantiles(
     samples: dict[str, Array],
     builder: CTMBuilder,
@@ -257,7 +268,7 @@ def cdist_quantiles(
             agg[name + "_1"] = x1
             agg[name + "_2"] = x2
         else:
-            agg[name] = smooth
+            agg |= array_to_dict(smooth, names_prefix=name)
 
     # Step 4: Bind together into a comfortable dataframe
     df = pd.DataFrame(agg)
