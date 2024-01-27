@@ -93,7 +93,7 @@ class Lin(Group):
         self.coef = Param(init, prior, name + "_coef")
         """The smooth's regression coef."""
 
-        self.smooth = Var(Calc(jnp.dot, x, self.coef), name=name)
+        self.smooth = Var(Calc(jnp.dot, self.x, self.coef), name=name)
         """The smooth ``x @ coef``."""
 
         self.sampled_params = [self.coef.name]
