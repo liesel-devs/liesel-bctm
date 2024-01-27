@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+from liesel_bctm.custom_types import Array
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.model import Calc, Dist
@@ -116,3 +117,53 @@ class Lin(Group):
             X = np.atleast_2d(x).T
         smooth = np.tensordot(X, coef_samples, axes=([1], [-1]))
         return np.moveaxis(smooth, 0, -1)
+
+
+class LinConst(Group):
+    """
+    Represents a linear smooth with a constant prior for the regression
+    coefficient.
+
+    Parameters
+    ----------
+    name
+        Group name.
+    x
+        Design matrix.
+    """
+
+    def __init__(self, name: str, x: Array) -> None:
+        self.x = Obs(np.atleast_2d(x).astype(np.float32), name=name + "_x")
+        """The design matrix for this smooth."""
+
+        nparam = np.shape(x)[-1]
+        init = np.zeros(nparam, dtype=np.float32)
+
+        self.coef = Param(init, name=name + "_coef")
+        """The smooth's regression coef."""
+
+        self.smooth = Var(Calc(jnp.dot, self.x, self.coef), name=name)
+        """The smooth ``x @ coef``."""
+
+        self.sampled_params = [self.coef.name]
+
+        super().__init__(
+            name, x=self.x, coef=self.coef, smooth=self.smooth
+        )
+
+    def ppeval(self, samples: dict, x: Array | None = None) -> Array:
+        """
+        Return posterior predictive evaluation of this smooth given an array of samples.
+
+        Uses :attr:`.X.value` if ``x=None``.
+        """
+        coef_samples = samples[self.coef.name]
+        if x is None:
+            X = self.x.value
+        elif len(np.shape(x)) >= 2:
+            X = x
+        elif len(np.shape(x)) <= 1:
+            X = np.atleast_2d(x).T
+        smooth = np.tensordot(X, coef_samples, axes=([1], [-1]))
+        return np.moveaxis(smooth, 0, -1)
+

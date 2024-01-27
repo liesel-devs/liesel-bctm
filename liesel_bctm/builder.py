@@ -160,6 +160,35 @@ class CTMBuilder(LieselDistRegBuilder):
         self.pt.append(lin)
         self.add_groups(lin)
         return self
+    
+    def add_linear_const(
+        self,
+        *x: Array | str,
+        name: str | None = None,
+    ) -> CTMBuilder:
+        """
+        Adds a parametric smooth to the model builder.
+
+
+        Parameters
+        ----------
+        *x
+            Covariates. Either arrays or strings, indicating the name of
+            covariate arrays in :attr:`.data`.
+        name
+            You can give a convenient name to this smooth. Allows you to retrieve the
+            smooth group object from the :meth:`.GraphBuilder.groups` and
+            :meth:`.Model.groups` by an easily identiable name. The smooth name will
+            also be used as prefix for all :class:`.Var`s in the smooth.
+        """
+        xval = np.column_stack([self._array(xvar) for xvar in x])
+        str_name = self._pt_name(name, "linear_const")
+
+        lin = nd.LinConst(str_name, xval)
+        self.pt.append(lin)
+        self.add_groups(lin)
+        return self
+    
 
     def add_intercept(self) -> CTMBuilder:
         """Adds a constant term (intercept). Has a constant prior."""
