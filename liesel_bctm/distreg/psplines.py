@@ -308,10 +308,13 @@ class BSplineBasis(Var):
         nparam: int,
         order: int = 3,
         name: str | None = None,
+        knots: Array | None = None
     ) -> None:
         # TODO: Make sure this is correct after update to liesel-internal
-        knots = kn(value, order=order, n_params=nparam)
+        if knots is None:
+            knots = kn(value, order=order, n_params=nparam)
         B = SplineDesign(value, knots=knots, order=order)
+        assert B.shape[-1] == nparam
 
         super().__init__(value=B, name=name)
 
@@ -668,10 +671,11 @@ class PSplineTP(Group):
         order: int = 3,
         weights: Array | None = None,
         Z: tuple[Array | None, Array | None] | Array = (None, None),
+        knots: tuple[Array | None, Array | None] = (None, None)
     ) -> None:
 
-        A = BSplineBasis(x[0], nparam[0], order=order, name=name + "_A")
-        B = BSplineBasis(x[1], nparam[1], order=order, name=name + "_B")
+        A = BSplineBasis(x[0], nparam[0], order=order, name=name + "_A", knots=knots[0])
+        B = BSplineBasis(x[1], nparam[1], order=order, name=name + "_B", knots=knots[1])
 
         nparam1 = A.value.shape[-1]
         nparam2 = B.value.shape[-1]

@@ -185,10 +185,11 @@ class MIPSplineTE1(Group):
         weights: Array | None = None,
         positive_tranformation: Callable[[Array], Array] = softplus,
         Z: Array | None = None,
+        knots: tuple[Array | None, Array | None] = (None, None)
     ) -> None:
 
-        A = ps.BSplineBasis(x[0], nparam[0], order=order, name=name + "_A")
-        B = ps.BSplineBasis(x[1], nparam[1], order=order, name=name + "_B")
+        A = ps.BSplineBasis(x[0], nparam[0], order=order, name=name + "_A", knots=knots[0])
+        B = ps.BSplineBasis(x[1], nparam[1], order=order, name=name + "_B", knots=knots[1])
 
         nparam1 = A.value.shape[-1]
         nparam2 = B.value.shape[-1]

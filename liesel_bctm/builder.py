@@ -19,6 +19,9 @@ from .distreg import mi_splines as mi
 from .distreg import node as nd
 from .distreg import psplines as ps
 
+from liesel_internal import splines
+kn = splines.create_equidistant_knots
+
 
 class CTMBuilder(LieselDistRegBuilder):
     """
@@ -423,6 +426,7 @@ class CTMBuilder(LieselDistRegBuilder):
             weights=weights,
             Z=(None, None),
         )
+
         self.pt.append(tp_spline)
         self.add_groups(tp_spline)
         return self
@@ -494,6 +498,7 @@ class CTMBuilder(LieselDistRegBuilder):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = jax.nn.softplus,
         name: str | None = None,
+        knot_boundaries: tuple[tuple[float, float] | None, tuple[float, float] | None] = tuple[None, None]
     ) -> CTMBuilder:
         """
         A tensor-product interaction that is monotonically increasing in the direction
@@ -536,6 +541,17 @@ class CTMBuilder(LieselDistRegBuilder):
         str_name = self._pt_name(name, "teprod_mi1_full")
         x1val, x2val = self._array(x1), self._array(x2)
 
+        bounds_y, bounds_x = knot_boundaries
+        if bounds_y is not None:
+            knots_y = kn(jnp.array(bounds_y), order=order, n_params=nparam[0])
+        else:
+            knots_y = None
+
+        if bounds_x is not None:
+            knots_x = kn(jnp.array(bounds_x), order=order, n_params=nparam[1])
+        else:
+            knots_x = None
+
         mite_spline = mi.MIPSplineTE1(
             str_name,
             x=(x1val, x2val),
@@ -546,6 +562,7 @@ class CTMBuilder(LieselDistRegBuilder):
             weights=weights,
             positive_tranformation=positive_tranformation,
             Z=None,
+            knots=(knots_y, knots_x)
         )
         self.pt.append(mite_spline)
         self.add_groups(mite_spline)
@@ -587,6 +604,7 @@ class CTMBuilder(LieselDistRegBuilder):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = jax.nn.softplus,
         name: str | None = None,
+        knot_boundaries: tuple[tuple[float, float] | None, tuple[float, float] | None] = tuple[None, None]
     ) -> CTMBuilder:
         """
         A tensor-product interaction that is monotonically increasing in the direction
@@ -637,6 +655,7 @@ class CTMBuilder(LieselDistRegBuilder):
             order=order,
             positive_tranformation=positive_tranformation,
             name=name,
+            knot_boundaries=knot_boundaries
         )
 
         mips = self.groups()[name]
