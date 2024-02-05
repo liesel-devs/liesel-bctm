@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
@@ -23,7 +23,7 @@ jobs:
 
       - name: Install liesel-internal
         run: |
-          pip install git+https://jobrachem:${{ secrets.ACCESS_LIESEL_INTERNAL }}@github.com/liesel-devs/liesel-internal.git@v0.2.2
+          pip install git+https://jobrachem:${{ secrets.ACCESS_LIESEL_INTERNAL }}@github.com/liesel-devs/liesel-internal.git@main
 
       - name: Install package
         run: |
