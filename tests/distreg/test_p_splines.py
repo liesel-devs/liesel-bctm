@@ -46,7 +46,7 @@ def B() -> Iterator[ps.BSplineBasis]:
 class TestBasisMatrix:
     def test_init(self, B: ps.BSplineBasis) -> None:
 
-        assert np.alltrue(B.obs_value == x)
+        assert np.all(B.obs_value == x)
 
     def test_nparam(self) -> None:
         nparam = 7
