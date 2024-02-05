@@ -1,5 +1,3 @@
-from collections import defaultdict
-
 import numpy as np
 import pandas as pd
 from liesel_internal import splines
@@ -13,42 +11,60 @@ SplineDesign_d = splines.build_design_matrix_b_spline_derivative
 kn = splines.create_equidistant_knots
 
 df = pd.read_csv("tests/files/framingham.csv", index_col=None)
-bctm_Z = pd.read_csv(
-    "tests/files/bctm_reparam.csv",
-    index_col=None,
-    header=None,
-    dtype=defaultdict(np.float32),
-).to_numpy()
-bctm_basis = pd.read_csv(
-    "tests/files/bctm_design_matrix.csv",
-    index_col=None,
-    header=None,
-    dtype=defaultdict(np.float32),
-).to_numpy()
-bctm_Ky = pd.read_csv(
-    "tests/files/bctm_penalty_y.csv",
-    index_col=None,
-    header=None,
-    dtype=defaultdict(np.float32),
-).to_numpy()
-bctm_Kx = pd.read_csv(
-    "tests/files/bctm_penalty_x.csv",
-    index_col=None,
-    header=None,
-    dtype=defaultdict(np.float32),
-).to_numpy()
-bctm_knots1 = pd.read_csv(
-    "tests/files/bctm_knots1.csv",
-    index_col=None,
-    header=None,
-    dtype=defaultdict(np.float32),
-).to_numpy()
-bctm_knots2 = pd.read_csv(
-    "tests/files/bctm_knots2.csv",
-    index_col=None,
-    header=None,
-    dtype=defaultdict(np.float32),
-).to_numpy()
+bctm_Z = (
+    pd.read_csv(
+        "tests/files/bctm_reparam.csv",
+        index_col=None,
+        header=None,
+    )
+    .astype(np.float32)
+    .to_numpy()
+)
+bctm_basis = (
+    pd.read_csv(
+        "tests/files/bctm_design_matrix.csv",
+        index_col=None,
+        header=None,
+    )
+    .astype(np.float32)
+    .to_numpy()
+)
+bctm_Ky = (
+    pd.read_csv(
+        "tests/files/bctm_penalty_y.csv",
+        index_col=None,
+        header=None,
+    )
+    .astype(np.float32)
+    .to_numpy()
+)
+bctm_Kx = (
+    pd.read_csv(
+        "tests/files/bctm_penalty_x.csv",
+        index_col=None,
+        header=None,
+    )
+    .astype(np.float32)
+    .to_numpy()
+)
+bctm_knots1 = (
+    pd.read_csv(
+        "tests/files/bctm_knots1.csv",
+        index_col=None,
+        header=None,
+    )
+    .astype(np.float32)
+    .to_numpy()
+)
+bctm_knots2 = (
+    pd.read_csv(
+        "tests/files/bctm_knots2.csv",
+        index_col=None,
+        header=None,
+    )
+    .astype(np.float32)
+    .to_numpy()
+)
 q1 = 4
 q2 = 4
 
