@@ -308,7 +308,7 @@ class BSplineBasis(Var):
         nparam: int,
         order: int = 3,
         name: str | None = None,
-        knots: Array | None = None
+        knots: Array | None = None,
     ) -> None:
         # TODO: Make sure this is correct after update to liesel-internal
         if knots is None:
@@ -671,7 +671,7 @@ class PSplineTP(Group):
         order: int = 3,
         weights: Array | None = None,
         Z: tuple[Array | None, Array | None] | Array = (None, None),
-        knots: tuple[Array | None, Array | None] = (None, None)
+        knots: tuple[Array | None, Array | None] = (None, None),
     ) -> None:
 
         A = BSplineBasis(x[0], nparam[0], order=order, name=name + "_A", knots=knots[0])

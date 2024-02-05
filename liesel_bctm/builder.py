@@ -11,6 +11,7 @@ from liesel.model import Calc
 from liesel.model import DistRegBuilder as LieselDistRegBuilder
 from liesel.model import GooseModel, Group, Model, Obs, Var
 from liesel.option import Option
+from liesel_internal import splines
 from pandas import DataFrame
 
 from .custom_types import Array, TFPDistribution
@@ -19,7 +20,6 @@ from .distreg import mi_splines as mi
 from .distreg import node as nd
 from .distreg import psplines as ps
 
-from liesel_internal import splines
 kn = splines.create_equidistant_knots
 
 
@@ -498,7 +498,9 @@ class CTMBuilder(LieselDistRegBuilder):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = jax.nn.softplus,
         name: str | None = None,
-        knot_boundaries: tuple[tuple[float, float] | None, tuple[float, float] | None] = tuple[None, None]
+        knot_boundaries: tuple[
+            tuple[float, float] | None, tuple[float, float] | None
+        ] = (None, None),
     ) -> CTMBuilder:
         """
         A tensor-product interaction that is monotonically increasing in the direction
@@ -562,7 +564,7 @@ class CTMBuilder(LieselDistRegBuilder):
             weights=weights,
             positive_tranformation=positive_tranformation,
             Z=None,
-            knots=(knots_y, knots_x)
+            knots=(knots_y, knots_x),
         )
         self.pt.append(mite_spline)
         self.add_groups(mite_spline)
@@ -604,7 +606,9 @@ class CTMBuilder(LieselDistRegBuilder):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = jax.nn.softplus,
         name: str | None = None,
-        knot_boundaries: tuple[tuple[float, float] | None, tuple[float, float] | None] = tuple[None, None]
+        knot_boundaries: tuple[
+            tuple[float, float] | None, tuple[float, float] | None
+        ] = (None, None),
     ) -> CTMBuilder:
         """
         A tensor-product interaction that is monotonically increasing in the direction
@@ -655,7 +659,7 @@ class CTMBuilder(LieselDistRegBuilder):
             order=order,
             positive_tranformation=positive_tranformation,
             name=name,
-            knot_boundaries=knot_boundaries
+            knot_boundaries=knot_boundaries,
         )
 
         mips = self.groups()[name]
