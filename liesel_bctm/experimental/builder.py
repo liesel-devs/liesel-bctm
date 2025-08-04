@@ -4,7 +4,7 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
-from liesel_internal import splines
+from ..liesel_internal import splines
 
 from .. import tp_penalty as tpp
 from ..builder import CTMBuilder, MITEDerivative

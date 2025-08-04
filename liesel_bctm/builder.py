@@ -6,12 +6,12 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
-from liesel.goose import EngineBuilder, NUTSKernel
+from liesel.goose import EngineBuilder, NUTSKernel, LieselInterface
 from liesel.model import Calc
 from liesel.model import DistRegBuilder as LieselDistRegBuilder
-from liesel.model import GooseModel, Group, Model, Obs, Var
+from liesel.model import Group, Model, Var
 from liesel.option import Option
-from liesel_internal import splines
+from .liesel_internal import splines
 from pandas import DataFrame
 
 from .custom_types import Array, TFPDistribution
@@ -122,7 +122,7 @@ class CTMBuilder(LieselDistRegBuilder):
         ct = Var(ct_calc, name="z")
         ctd = Var(Calc(_sum2, *self.ptd), name="zd")
         dist = TDist(ct=ct, ctd=ctd, refdist=refdist)
-        y = Obs(yval, distribution=dist, name="response")
+        y = Var.new_obs(yval, distribution=dist, name="response")
 
         self._response = Option(y)
         self.add(y)
@@ -694,7 +694,7 @@ class MIPSDerivative(Var):
         name: str = "",
     ):
         self.pt = pt
-        basis_derivative = Obs(pt.X.d(), name=name + "_X")
+        basis_derivative = Var.new_obs(pt.X.d(), name=name + "_X")
         positive_coef = pt.positive_coef
         calc = Calc(jnp.dot, basis_derivative, positive_coef)
         super().__init__(calc, name=name)
@@ -715,7 +715,7 @@ class MITEDerivative(Var):
         name: str = "",
     ):
         self.pt = pt
-        basis_derivative = Obs(pt.X.da(), name=name + "_X")
+        basis_derivative = Var.new_obs(pt.X.da(), name=name + "_X")
         positive_coef = pt.positive_coef
         calc = Calc(jnp.dot, basis_derivative, positive_coef)
         super().__init__(calc, name=name)
@@ -751,7 +751,7 @@ def ctm_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
 
     builder = EngineBuilder(seed, num_chains)
 
-    builder.set_model(GooseModel(model))
+    builder.set_model(LieselInterface(model))
     builder.set_initial_values(model.state)
 
     for group in model.groups().values():

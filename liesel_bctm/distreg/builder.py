@@ -9,10 +9,10 @@ from typing import Callable
 
 import jax
 import numpy as np
-from liesel.goose import EngineBuilder, NUTSKernel
+from liesel.goose import EngineBuilder, NUTSKernel, LieselInterface
 from liesel.model import Bijector
 from liesel.model import DistRegBuilder as LieselDistRegBuilder
-from liesel.model import Distribution, GooseModel, Model, Var
+from liesel.model import Distribution, Model, Var
 from liesel.option import Option
 from pandas import DataFrame
 
@@ -448,7 +448,7 @@ def dist_reg_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
 
     builder = EngineBuilder(seed, num_chains)
 
-    builder.set_model(GooseModel(model))
+    builder.set_model(LieselInterface(model))
     builder.set_initial_values(model.state)
 
     nuts_params = []

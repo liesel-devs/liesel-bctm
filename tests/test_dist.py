@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 import tensorflow_probability.substrates.jax.distributions as tfd
-from liesel.model import Calc, GraphBuilder, Obs, Var
+from liesel.model import Calc, GraphBuilder, Var
 
 from liesel_bctm.dist import TDist
 from liesel_bctm.distreg import mi_splines as mi
@@ -26,7 +26,7 @@ def ct(mips: mi.MIPSpline) -> Iterator[Var]:
 
 @pytest.fixture
 def ctd(mips: mi.MIPSpline) -> Iterator[Var]:
-    basis_derivative = Obs(mips.X.d(), name="Bd")
+    basis_derivative = Var.new_obs(mips.X.d(), name="Bd")
     positive_coef = mips.positive_coef
     yield Var(Calc(jnp.dot, basis_derivative, positive_coef), name="ctd")
 
@@ -43,7 +43,7 @@ class TestTransformationDist:
 
     def test_as_dist(self, ct: Var, ctd: Var) -> None:
         dist = TDist(ct=ct, ctd=ctd, refdist=Ndist)
-        yvar = Obs(y, distribution=dist, name="y")
+        yvar = Var.new_obs(y, distribution=dist, name="y")
 
         m = GraphBuilder().add(yvar).build_model()  # updates everything
 

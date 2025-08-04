@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from liesel_internal import splines
+from liesel_bctm.liesel_internal import splines
 
 from liesel_bctm.distreg import constraints
 from liesel_bctm.distreg import mi_splines as mi
@@ -104,7 +104,7 @@ def test_penalty_y() -> None:
 
 def test_penalty_x() -> None:
     """
-    Manus uses a different penalty for the covariate. He uses 2nd order only for
+    Manu uses a different penalty for the covariate. He uses 2nd order only for
     the untransformed coefficients. For the transformed ones, he uses 1st order.
     """
     pen2 = ps.pen(q2)

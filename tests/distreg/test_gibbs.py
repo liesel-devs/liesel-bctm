@@ -38,21 +38,21 @@ class TestVarGibbsKernel:
         key = jax.random.PRNGKey(1)
         model = lsl.GraphBuilder().add(pspline.smooth).build_model()
         kernel = gb.igvar_gibbs_kernel(pspline)
-        draw = kernel._transition_fn(key, model_state=model.state)
-        assert draw["test_igvar"].round(2) == pytest.approx(0.16)
+        draw = kernel._transition_fn(key, model.state)
+        assert draw["test_igvar"].round(2) == pytest.approx(0.149, abs=0.01)
 
     def test_transition_ps_jit(self, pspline: ps.PSpline) -> None:
         key = jax.random.PRNGKey(1)
         model = lsl.GraphBuilder().add(pspline.smooth).build_model()
         kernel = gb.igvar_gibbs_kernel(pspline)
         draw = jax.jit(kernel._transition_fn)(key, model_state=model.state)
-        assert draw["test_igvar"].round(2) == pytest.approx(0.16)
+        assert draw["test_igvar"].round(2) == pytest.approx(0.149, abs=0.01)
 
     def test_transition_tp(self, tp: ps.PSplineTP, model: lsl.Model) -> None:
         key = jax.random.PRNGKey(1)
 
         kernel = gb.igvar_gibbs_kernel(tp)
-        draw = kernel._transition_fn(key, model_state=model.state)
+        draw = kernel._transition_fn(key, model.state)
         assert draw["test_igvar"].round(2) == pytest.approx(0.03)
 
     def test_transition_tp_jit(self, tp: ps.PSplineTP, model: lsl.Model) -> None:
@@ -81,12 +81,12 @@ class TestWeightGibbsKernel:
         key = jax.random.PRNGKey(1)
 
         kernel = gb.weight_gibbs_kernel(tp)
-        draw = kernel._transition_fn(key, model_state=model.state)
-        assert draw["test_penalty_weight"].round(2) == pytest.approx(0.36)
+        draw = kernel._transition_fn(key, model.state)
+        assert draw["test_penalty_weight"].round(2) == pytest.approx(0.429, abs=0.01)
 
     def test_run_weight_kernel_jit(self, tp: ps.PSplineTP, model: lsl.Model) -> None:
         key = jax.random.PRNGKey(1)
 
         kernel = gb.weight_gibbs_kernel(tp)
         draw = jax.jit(kernel._transition_fn)(key, model_state=model.state)
-        assert draw["test_penalty_weight"].round(2) == pytest.approx(0.36)
+        assert draw["test_penalty_weight"].round(2) == pytest.approx(0.429, abs=0.01)

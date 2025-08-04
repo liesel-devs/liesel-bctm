@@ -11,9 +11,9 @@ import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from jax.nn import softplus
 from liesel.goose import GibbsKernel
-from liesel.model import Calc, Data, Dist, Param, Var
-from liesel_internal import splines
-from liesel_internal.lookup import LookUp, LookUpCalculator
+from liesel.model import Calc, Data, Dist, Var
+from .liesel_internal import splines
+from .liesel_internal.lookup import LookUp, LookUpCalculator
 
 from .custom_types import Array
 from .distreg import constraints, gibbs
@@ -271,7 +271,7 @@ class PenaltyGroupTP(Group):
         weights_prior = Dist(
             tfd.FiniteDiscrete, outcomes=self.weight_grid, probs=self.probs
         )
-        self.weight = Param(
+        self.weight = Var.new_param(
             np.quantile(weights, 0.5),
             distribution=weights_prior,
             name=name + "_weight",
@@ -342,7 +342,7 @@ class PenaltyGroupTPExp2(Group):
         weights_prior = Dist(
             tfd.FiniteDiscrete, outcomes=self.weight_grid, probs=self.probs
         )
-        self.weight = Param(
+        self.weight = Var.new_param(
             np.quantile(weights, 0.5),
             distribution=weights_prior,
             name=name + "_weight",

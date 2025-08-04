@@ -9,9 +9,9 @@ import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.distributions import MultivariateNormalDegenerate
 from liesel.goose import GibbsKernel
-from liesel.model import Calc, Data, Dist, Param, Var
-from liesel_internal import splines
-from liesel_internal.lookup import LookUp, LookUpCalculator
+from liesel.model import Calc, Data, Dist, Var
+from ..liesel_internal import splines
+from ..liesel_internal.lookup import LookUp, LookUpCalculator
 
 from ..custom_types import Array
 from . import constraints, gibbs
@@ -51,7 +51,7 @@ class IGVariance(Group):
         """Scale parameter of the inverse gamma prior."""
 
         prior = Dist(tfd.InverseGamma, concentration=self.a, scale=self.b)
-        self.var_param = Param(start_value, prior, name)
+        self.var_param = Var.new_param(start_value, prior, name)
         """The variance parameter."""
 
         super().__init__(name=name, var_param=self.var_param, a=self.a, b=self.b)
@@ -254,7 +254,7 @@ class PenaltyGroupTP(Group):
         weights_prior = Dist(
             tfd.FiniteDiscrete, outcomes=self.weight_grid, probs=self.probs
         )
-        self.weight = Param(
+        self.weight = Var.new_param(
             np.quantile(weights, 0.5),
             distribution=weights_prior,
             name=name + "_weight",
@@ -552,11 +552,9 @@ class SplineCoef(Var):
     ``penalty.penalty`` penalty matrix. The penalty matrix may be rank-deficient.
     """
 
-    parameter = True
-
     def __init__(
         self,
-        var_param: Param,
+        var_param: Var,
         penalty: PenaltyGroup | PenaltyGroupTP,
         name: str = "",
     ):
@@ -576,6 +574,7 @@ class SplineCoef(Var):
 
         super().__init__(start_value, prior, name=name)
         self.value_node.monitor = True
+        self.parameter = True
 
 
 # ----------------------------------------------------------------------

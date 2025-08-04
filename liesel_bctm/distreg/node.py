@@ -4,7 +4,7 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.distributions import MultivariateNormalDegenerate
 from liesel.goose import NUTSKernel
 from liesel.model import Group as LieselGroup
-from liesel.model import Obs, Param, Var, obs, param
+from liesel.model import Var
 from liesel.model.nodes import Calc, Data, Dist, Node
 from sklearn.preprocessing import LabelBinarizer
 
@@ -53,7 +53,7 @@ class SVar(Var):
 
 class Intercept(Group):
     def __init__(self, name: str) -> None:
-        self.intercept = Param(np.zeros(1, dtype=np.float32), name=name)
+        self.intercept = Var.new_param(np.zeros(1, dtype=np.float32), name=name)
         """The intercept parameter."""
 
         self.sampled_params = [self.intercept.name]
@@ -79,7 +79,7 @@ class Lin(Group):
     """
 
     def __init__(self, name: str, x: Array, m: float, s: float) -> None:
-        self.x = Obs(np.atleast_2d(x).astype(np.float32), name=name + "_x")
+        self.x = Var.new_obs(np.atleast_2d(x).astype(np.float32), name=name + "_x")
         """The design matrix for this smooth."""
 
         self.m = Var(m, name=name + "_m")
@@ -92,7 +92,7 @@ class Lin(Group):
         init = np.zeros(nparam, dtype=np.float32)
         prior = Dist(tfd.Normal, loc=self.m, scale=self.s)
 
-        self.coef = Param(init, prior, name + "_coef")
+        self.coef = Var.new_param(init, prior, name + "_coef")
         """The smooth's regression coef."""
 
         self.smooth = Var(Calc(jnp.dot, self.x, self.coef), name=name)
@@ -135,13 +135,13 @@ class LinConst(Group):
     """
 
     def __init__(self, name: str, x: Array) -> None:
-        self.x = Obs(np.atleast_2d(x).astype(np.float32), name=name + "_x")
+        self.x = Var.new_obs(np.atleast_2d(x).astype(np.float32), name=name + "_x")
         """The design matrix for this smooth."""
 
         nparam = np.shape(x)[-1]
         init = np.zeros(nparam, dtype=np.float32)
 
-        self.coef = Param(init, name=name + "_coef")
+        self.coef = Var.new_param(init, name=name + "_coef")
         """The smooth's regression coef."""
 
         self.smooth = Var(Calc(jnp.dot, self.x, self.coef), name=name)
@@ -237,13 +237,13 @@ class RandomIntercept(Lin):
     def __init__(self, x: Array, tau: Var, name: str) -> None:
         self.label_binarizer = LabelBinarizer()
         self.label_binarizer.fit(x)
-        self.x = obs(x, name=f"{name}_covariate")
+        self.x = Var.new_obs(x, name=f"{name}_covariate")
         self.basis_fn = self.label_binarizer.transform
         self.basis = Data(self.basis_fn(x), _name=f"{name}_basis")
         self.tau = tau
 
         prior = Dist(tfd.Normal, loc=0.0, scale=1.0)
-        self.coef = param(
+        self.coef = Var.new_param(
             np.zeros(self.basis.value.shape[-1]), prior, name=f"{name}_coef"
         )
 
@@ -320,7 +320,7 @@ class RandomInterceptSumZero(RandomIntercept):
     def __init__(self, x: Array, tau: Var, name: str) -> None:
         self.label_binarizer = LabelBinarizer()
         self.label_binarizer.fit(x)
-        self.x = obs(x, name=f"{name}_covariate")
+        self.x = Var.new_obs(x, name=f"{name}_covariate")
 
         nparam = self.label_binarizer.transform(x).shape[-1]
         K = jnp.eye(nparam)

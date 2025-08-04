@@ -439,7 +439,7 @@ class TestDistRegBuilderMCMC:
         _, p = scipy.stats.normaltest(z)
         assert p >= 0.05
 
-    @pytest.mark.mcmc
+    # @pytest.mark.mcmc
     def test_trafo_teprod_full_mcmc(self) -> None:
         ctmb = (
             CTMBuilder(data)
