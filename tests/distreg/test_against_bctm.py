@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
-from liesel_bctm.liesel_internal import splines
 
 from liesel_bctm.distreg import constraints
 from liesel_bctm.distreg import mi_splines as mi
 from liesel_bctm.distreg import psplines as ps
+from liesel_bctm.liesel_internal import splines
 
 SplineDesign = splines.build_design_matrix_b_spline
 SplineDesign_d = splines.build_design_matrix_b_spline_derivative

@@ -190,8 +190,12 @@ def model_p_spline(
     tau2_dist = Dist(InverseGamma, concentration=tau_a, scale=tau_b)
     tau2 = Var(10000.0, tau2_dist, name="tau2")
 
-    prior = Dist(MultivariateNormalDegenerate.from_penalty,
-        loc=0.0, var=tau2, pen=K_var, rank=rank
+    prior = Dist(
+        MultivariateNormalDegenerate.from_penalty,
+        loc=0.0,
+        var=tau2,
+        pen=K_var,
+        rank=rank,
     )
 
     beta_param = Var.new_param(value=beta, distribution=prior, name="beta")

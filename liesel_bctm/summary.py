@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Sequence
 from functools import cache, cached_property
 from itertools import product
 from pathlib import Path
-from typing import Callable, Iterator, Sequence
 
 import liesel.goose as gs
 import numpy as np
@@ -20,7 +20,6 @@ def grid(*arrays) -> tuple:
 
 
 class ConditionalPredictions:
-
     """
     Note that the returned arrays have the same axis organization as the
     :attr:`.samples` dict.
@@ -123,7 +122,7 @@ class ConditionalPredictions:
 
         for pt in pts:
             val = self.smooths[pt.name]
-            smooth_value = pt.ppeval(samples=self.samples, x=val)
+            smooth_value = pt.ppeval(samples=self.samples, x=val)  # type: ignore
             smooth_values.append(np.moveaxis(smooth_value, -1, 0))
 
         return self._postprocess_smooth(smooth_values)
@@ -350,7 +349,6 @@ def cdist_quantiles_early(
     data["log_prob-mean"] = ctmp.log_prob()
 
     for name, smooth in smooths.items():
-
         if isinstance(smooth, tuple):
             x1, x2 = smooth
 
@@ -478,7 +476,6 @@ def partial_ctrans_df_early(
     data["value_d-mean"] = ctmp.partial_ctrans_d()
 
     for name, smooth in smooths.items():
-
         if isinstance(smooth, tuple):
             x1, x2 = smooth
 
@@ -499,16 +496,16 @@ def _product(**kwargs) -> Iterator[dict[str, float | int]]:
     """
     Creates dictionaries of all combinations of the input iterables. Example::
 
-        l = {"A": np.array([1., 2.]), "B": np.array([3., 4.]), "C": np.array([5.])}
+        l = {"A": np.array([1.0, 2.0]), "B": np.array([3.0, 4.0]), "C": np.array([5.0])}
         list(_product(**l))
 
     Returns::
 
         [
-            {'A': 1.0, 'B': 3.0, 'C': 5.0},
-            {'A': 1.0, 'B': 4.0, 'C': 5.0},
-            {'A': 2.0, 'B': 3.0, 'C': 5.0},
-            {'A': 2.0, 'B': 4.0, 'C': 5.0}
+            {"A": 1.0, "B": 3.0, "C": 5.0},
+            {"A": 1.0, "B": 4.0, "C": 5.0},
+            {"A": 2.0, "B": 3.0, "C": 5.0},
+            {"A": 2.0, "B": 4.0, "C": 5.0},
         ]
     """
     return (dict(zip(kwargs, u)) for u in product(*kwargs.values()))

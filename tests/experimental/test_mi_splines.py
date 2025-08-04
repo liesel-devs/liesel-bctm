@@ -1,4 +1,4 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 import jax
 import liesel.model as lsl
@@ -75,7 +75,7 @@ class TestAddRestrictedInteractionToBuilder:
         )
 
         ctmb.pt.append(tp)
-        ctmb.ptd.append(MITEDerivative(tp, name="yx2_d"))
+        ctmb.ptd.append(MITEDerivative(tp, name="yx2_d"))  # type: ignore
         ctmb.add_groups(tp)
         ctmb = ctmb.add_response("y")
 
@@ -97,7 +97,7 @@ class TestAddRestrictedInteractionToBuilder:
         )
 
         ctmb.pt.append(tp)
-        ctmb.ptd.append(MITEDerivative(tp, name="yx2_d"))
+        ctmb.ptd.append(MITEDerivative(tp, name="yx2_d"))  # type: ignore
         ctmb.add_groups(tp)
         ctmb = ctmb.add_response("y")
 

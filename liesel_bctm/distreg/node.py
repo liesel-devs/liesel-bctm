@@ -2,22 +2,26 @@ import jax.numpy as jnp
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.distributions import MultivariateNormalDegenerate
-from liesel.goose import NUTSKernel
+from liesel.goose import GibbsKernel, NUTSKernel
 from liesel.model import Group as LieselGroup
-from liesel.model import Var
-from liesel.model.nodes import Calc, Data, Dist, Node
+from liesel.model import Node, Var
+from liesel.model.nodes import Calc, Data, Dist
 from sklearn.preprocessing import LabelBinarizer
 
 from ..custom_types import Array, Kernel
 
 
 class Group(LieselGroup):
-
     return_kernels: bool = False
     """If False, the group's :meth:`.gibbs_kernels` method returns an empty list."""
 
     sampled_params: list[str] = []
     """Names of the params that can be sampled with samplers like NUTS or IWLS."""
+
+    smooth: Var
+
+    def _gibbs_kernels(self) -> list[GibbsKernel]:
+        raise NotImplementedError
 
     def gibbs_kernels(self) -> list[Kernel]:
         if not self.return_kernels:
@@ -179,6 +183,8 @@ def find_param(var: Var) -> Var | None:
 
     var_value_node = var.value_node.inputs[0]
     value_var = var_value_node.inputs[0].var
+    if value_var is None:
+        raise ValueError(f"{value_var=} is invalid.")
     return find_param(value_var)
 
 
@@ -202,7 +208,7 @@ class ScaledDot(Calc):
     def __init__(
         self,
         x: Var | Node,
-        coef: Var | Node,
+        coef: Var,
         scale: Var,
         _name: str = "",
     ) -> None:
@@ -294,7 +300,6 @@ class RandomIntercept(Lin):
         return kernels
 
     def ppeval(self, samples: dict, x: Array | None = None) -> Array:
-
         coef_samples = samples[self.coef.name]
         coef_samples = np.atleast_3d(coef_samples)
 
@@ -345,7 +350,7 @@ class RandomInterceptSumZero(RandomIntercept):
             log_pdet=self.log_pdet,
         )
 
-        self.coef = param(np.zeros(Kz.shape[-1]), prior, name=f"{name}_coef")
+        self.coef = Var.new_param(np.zeros(Kz.shape[-1]), prior, name=f"{name}_coef")
 
         self.smooth = Var(
             ScaledDot(x=self.basis, coef=self.coef, scale=self.tau),

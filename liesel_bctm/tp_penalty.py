@@ -1,10 +1,11 @@
 """
 Functionality for the penalty in a transforming tensor product.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
 import jax.numpy as jnp
 import numpy as np
@@ -12,8 +13,6 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from jax.nn import softplus
 from liesel.goose import GibbsKernel
 from liesel.model import Calc, Data, Dist, Var
-from .liesel_internal import splines
-from .liesel_internal.lookup import LookUp, LookUpCalculator
 
 from .custom_types import Array
 from .distreg import constraints, gibbs
@@ -21,6 +20,8 @@ from .distreg import psplines as ps
 from .distreg.mi_splines import _apply_positive_tranformation, _cumsum, mi_pen
 from .distreg.node import Group
 from .distreg.psplines import _RankDet, pen
+from .liesel_internal import splines
+from .liesel_internal.lookup import LookUp, LookUpCalculator
 
 SplineDesign = splines.build_design_matrix_b_spline
 SplineDesign_d = splines.build_design_matrix_b_spline_derivative
@@ -413,7 +414,6 @@ class MIPSplineTE1(Group):
         positive_tranformation: Callable[[Array], Array] = softplus,
         Z: Array | None = None,
     ) -> None:
-
         A = ps.BSplineBasis(x[0], nparam[0], order=order, name=name + "_A")
         B = ps.BSplineBasis(x[1], nparam[1], order=order, name=name + "_B")
 
@@ -454,7 +454,9 @@ class MIPSplineTE1(Group):
         """The penalty group."""
 
         self.coef = ps.SplineCoef(
-            self.var_group.var_param, self.pen_group, name=name + "_coef"
+            self.var_group.var_param,
+            self.pen_group,  # type: ignore
+            name=name + "_coef",
         )
         """The coefficient."""
 

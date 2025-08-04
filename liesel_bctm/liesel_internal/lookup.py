@@ -106,7 +106,7 @@ class LookUp(Node):
         self,
         mapping: dict[float, float | Array],
         key_node: Node | Var,
-        name: str | None = None,
+        name: str = "",
     ) -> None:
         self.lookup_calculator = LookUpCalculator(mapping, key_node)
         super().__init__(self.lookup_calculator, _name=name)

@@ -1,4 +1,4 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 import numpy as np
 import pytest
@@ -280,7 +280,7 @@ class TestDistRegBuilderMCMC:
         results = engine.get_results()
         samples = results.get_posterior_samples()
 
-        X = model.groups()["mi"].X.value
+        X = model.groups()["mi"]["X"].value
         mean_coef = np.squeeze(samples["mi_positive_coef"].mean(axis=1))
         mi_smooth = X @ mean_coef
         diff = np.diff(mi_smooth)

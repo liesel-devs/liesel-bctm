@@ -1,4 +1,4 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 import liesel.model as lsl
 import numpy as np
@@ -45,7 +45,6 @@ def B() -> Iterator[ps.BSplineBasis]:
 
 class TestBasisMatrix:
     def test_init(self, B: ps.BSplineBasis) -> None:
-
         assert np.all(B.obs_value == x)
 
     def test_nparam(self) -> None:

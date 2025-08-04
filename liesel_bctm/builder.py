@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import tensorflow_probability.substrates.jax.distributions as tfd
-from liesel.goose import EngineBuilder, NUTSKernel, LieselInterface
-from liesel.model import Calc
+from liesel.goose import EngineBuilder, LieselInterface, NUTSKernel
+from liesel.model import Calc, Model, Var
 from liesel.model import DistRegBuilder as LieselDistRegBuilder
-from liesel.model import Group, Model, Var
 from liesel.option import Option
-from .liesel_internal import splines
 from pandas import DataFrame
 
 from .custom_types import Array, TFPDistribution
@@ -19,6 +17,7 @@ from .dist import TDist
 from .distreg import mi_splines as mi
 from .distreg import node as nd
 from .distreg import psplines as ps
+from .liesel_internal import splines
 
 kn = splines.create_equidistant_knots
 
@@ -40,18 +39,20 @@ class CTMBuilder(LieselDistRegBuilder):
     def __init__(self, data: dict[str, Array] | DataFrame | None = None) -> None:
         super().__init__()
 
-        self.pt: list[Group] = []
+        self.pt: list[nd.Group] = []
         """List of partial transformations."""
 
         self.ptd: list[Var] = []
-        """List of derivatives of partial transformations with respect to the response."""
+        """
+        List of derivatives of partial transformations with respect to the response.
+        """
 
         self._response: Option[Var] = Option(None)
 
         self.redist = None
         """Reference distribution instance."""
 
-        self.intercept_node = None
+        self.intercept_node: Var | None = None
         """The model intercept node."""
 
         self.data = data
@@ -591,6 +592,8 @@ class CTMBuilder(LieselDistRegBuilder):
             name=name,
         )
         mips = self.groups()[name]
+        if not isinstance(mips, mi.MIPSpline):
+            raise TypeError
         mipsd = MIPSDerivative(mips, name=name + "_d")
         self.ptd.append(mipsd)
         return self
@@ -663,6 +666,8 @@ class CTMBuilder(LieselDistRegBuilder):
         )
 
         mips = self.groups()[name]
+        if not isinstance(mips, mi.MIPSplineTE1):
+            raise TypeError
         mipsd = MITEDerivative(mips, name=name + "_d")
         self.ptd.append(mipsd)
         return self
@@ -755,14 +760,14 @@ def ctm_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
     builder.set_initial_values(model.state)
 
     for group in model.groups().values():
-        for kernel in group.gibbs_kernels():
+        for kernel in group.gibbs_kernels():  # type: ignore
             builder.add_kernel(kernel)
 
-        if group.sampled_params:
-            builder.add_kernel(NUTSKernel(group.sampled_params))
+        if group.sampled_params:  # type: ignore
+            builder.add_kernel(NUTSKernel(group.sampled_params))  # type: ignore
 
         if hasattr(group, "mcmc_kernels"):
-            for kernel in group.mcmc_kernels:
+            for kernel in group.mcmc_kernels:  # type: ignore
                 builder.add_kernel(kernel)
 
     return builder

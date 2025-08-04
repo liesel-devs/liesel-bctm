@@ -1,4 +1,4 @@
-from typing import Callable
+from collections.abc import Callable
 
 import jax.numpy as jnp
 import numpy as np
@@ -47,7 +47,6 @@ class MIPSplineTE1NoCovariate2MainEffect(Group):
         positive_tranformation: Callable[[Array], Array] = softplus,
         Z: Array | None = None,
     ) -> None:
-
         A = ps.BSplineBasis(x[0], nparam[0], order=order, name=name + "_A")
         B = ps.BSplineBasis(x[1], nparam[1], order=order, name=name + "_B")
 
@@ -114,7 +113,7 @@ class MIPSplineTE1NoCovariate2MainEffect(Group):
             coef=self.coef,
             positive_coef=self.positive_coef,
             smooth=self.smooth,
-            **contents
+            **contents,
         )
 
     def _gibbs_kernels(self) -> list[GibbsKernel]:
@@ -163,7 +162,6 @@ class ExperimentalTE2(Group):
         weights: Array | None = None,
         positive_tranformation: Callable[[Array], Array] = softplus,
     ) -> None:
-
         A = ps.BSplineBasis(x[0], nparam[0], order=order, name=name + "_A")
         B = ps.BSplineBasis(x[1], nparam[1], order=order, name=name + "_B")
 
@@ -207,7 +205,9 @@ class ExperimentalTE2(Group):
         """The penalty group."""
 
         self.coef = ps.SplineCoef(
-            self.var_group.var_param, self.pen_group, name=name + "_coef"
+            self.var_group.var_param,
+            self.pen_group,  # type: ignore
+            name=name + "_coef",  # type: ignore
         )
         """The coefficient."""
 
@@ -230,7 +230,7 @@ class ExperimentalTE2(Group):
             coef=self.coef,
             positive_coef=self.positive_coef,
             smooth=self.smooth,
-            **contents
+            **contents,
         )
 
     def _gibbs_kernels(self) -> list[GibbsKernel]:

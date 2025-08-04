@@ -1,6 +1,7 @@
 """
 Functionality for P-Splines.
 """
+
 from __future__ import annotations
 
 import jax
@@ -10,10 +11,10 @@ import tensorflow_probability.substrates.jax.distributions as tfd
 from liesel.distributions import MultivariateNormalDegenerate
 from liesel.goose import GibbsKernel
 from liesel.model import Calc, Data, Dist, Var
-from ..liesel_internal import splines
-from ..liesel_internal.lookup import LookUp, LookUpCalculator
 
 from ..custom_types import Array
+from ..liesel_internal import splines
+from ..liesel_internal.lookup import LookUp, LookUpCalculator
 from . import constraints, gibbs
 from .node import Group
 
@@ -43,7 +44,6 @@ class IGVariance(Group):
     """
 
     def __init__(self, name: str, a: float, b: float, start_value: float = 100.0):
-
         self.a = Var(a, name=name + "_a")
         """Concentration/rate parameter of the inverse gamma prior."""
 
@@ -300,14 +300,12 @@ class PenaltyGroupTP(Group):
 class BSplineBasis(Var):
     """A design matrix of B-spline basis function evaluations."""
 
-    observed = True
-
     def __init__(
         self,
         value: Array,
         nparam: int,
         order: int = 3,
-        name: str | None = None,
+        name: str = "",
         knots: Array | None = None,
     ) -> None:
         # TODO: Make sure this is correct after update to liesel-internal
@@ -332,6 +330,8 @@ class BSplineBasis(Var):
 
         self.order = order
         """Order of the B-splines used in this basis matrix."""
+
+        self.observed = True
 
     def reparam(self, Z: Array) -> BSplineBasis:
         """
@@ -385,7 +385,7 @@ class BSplineBasisCentered(BSplineBasis):
         value: Array,
         nparam: int,
         order: int = 3,
-        name: str | None = None,
+        name: str = "",
     ) -> None:
         # TODO: Make sure this is correct after update to liesel-internal
         knots = kn(value, order=order, n_params=nparam)
@@ -453,11 +453,7 @@ class TPBasis(Var):
     :class:`.BSplineBasis` objects.
     """
 
-    observed = True
-
-    def __init__(
-        self, A: BSplineBasis, B: BSplineBasis, name: str | None = None
-    ) -> None:
+    def __init__(self, A: BSplineBasis, B: BSplineBasis, name: str = "") -> None:
         C = kron_rowwise(A.value, B.value)
         super().__init__(C, name=name)
 
@@ -474,6 +470,8 @@ class TPBasis(Var):
         design matrices already have an identifiability constraint. Initialised as
         the identity matrix; a new one can be applied with :meth:`.reparam`.
         """
+
+        self.observed = True
 
     def bs(self, x: tuple[Array | float, Array | float] | None) -> Array:
         """Evaluate the basis at fixed values."""
@@ -525,7 +523,7 @@ class TPBasis(Var):
             b = np.full(a.shape, b, dtype=np.float32)
         b = b if b is not None else self.B.obs_value
         _assert_shape(a, b)
-        return kron_rowwise(self.A(a), self.B.d(b)) @ self.Z
+        return kron_rowwise(self.A.d(a), self.B.d(b)) @ self.Z
 
     def reparam(self, Z: Array) -> TPBasis:
         """
@@ -672,7 +670,6 @@ class PSplineTP(Group):
         Z: tuple[Array | None, Array | None] | Array = (None, None),
         knots: tuple[Array | None, Array | None] = (None, None),
     ) -> None:
-
         A = BSplineBasis(x[0], nparam[0], order=order, name=name + "_A", knots=knots[0])
         B = BSplineBasis(x[1], nparam[1], order=order, name=name + "_B", knots=knots[1])
 

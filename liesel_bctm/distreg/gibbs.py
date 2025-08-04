@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import jax.random
 from liesel.distributions import MultivariateNormalDegenerate
 from liesel.goose import GibbsKernel
+from liesel.goose.types import Position
 from liesel.model.nodes import Array, Group, NodeState
 
 from ..custom_types import KeyArray
@@ -24,7 +25,7 @@ def igvar_gibbs_kernel(group: Group) -> GibbsKernel:
     """
     position_key = group["var_param"].name
 
-    def transition(prng_key, model_state: dict[str, NodeState]) -> dict[str, Array]:
+    def transition(prng_key, model_state: dict[str, NodeState]) -> Position:
         a = group.value_from(model_state, "a")
         rank = group.value_from(model_state, "rank")
 
@@ -38,7 +39,7 @@ def igvar_gibbs_kernel(group: Group) -> GibbsKernel:
 
         draw = b_gibbs / jax.random.gamma(prng_key, a_gibbs)
 
-        return {position_key: draw}
+        return Position({position_key: draw})
 
     return GibbsKernel([position_key], transition)
 
@@ -47,13 +48,11 @@ def weight_gibbs_kernel(group: Group) -> GibbsKernel:
     position_key = group["weight"].name
     weight_grid = group["weight_grid"].value
 
-    def transition(
-        prng_key: KeyArray, model_state: dict[str, NodeState]
-    ) -> dict[str, Array]:
+    def transition(prng_key: KeyArray, model_state: dict[str, NodeState]) -> Position:
         log_probs = _coef_log_probs(group, model_state)
         draw = jax.random.categorical(prng_key, logits=log_probs)
 
-        return {position_key: weight_grid[draw]}
+        return Position({position_key: weight_grid[draw]})
 
     return GibbsKernel([position_key], transition)
 

@@ -5,12 +5,12 @@ An adapted copy of the liesel.model.distreg module.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable
+from collections.abc import Callable
 
 import jax
 import numpy as np
-from liesel.goose import EngineBuilder, NUTSKernel, LieselInterface
-from liesel.model import Bijector
+import tensorflow_probability.substrates.jax.bijectors as tfb
+from liesel.goose import EngineBuilder, LieselInterface, NUTSKernel
 from liesel.model import DistRegBuilder as LieselDistRegBuilder
 from liesel.model import Distribution, Model, Var
 from liesel.option import Option
@@ -66,7 +66,7 @@ class DistRegBuilder(LieselDistRegBuilder):
         super().add_response(yval, distribution)
         return self
 
-    def add_param(self, name: str, inverse_link: type[Bijector]) -> DistRegBuilder:
+    def add_param(self, name: str, inverse_link: type[tfb.Bijector]) -> DistRegBuilder:
         """
         Adds a param: a parameter of the response distribution.
         Execute this before adding the response.
@@ -454,10 +454,10 @@ def dist_reg_mcmc(model: Model, seed: int, num_chains: int) -> EngineBuilder:
     nuts_params = []
 
     for group in model.groups().values():
-        for kernel in group.gibbs_kernels():
+        for kernel in group.gibbs_kernels():  # type: ignore
             builder.add_kernel(kernel)
 
-        nuts_params += group.sampled_params
+        nuts_params += group.sampled_params  # type: ignore
 
     builder.add_kernel(NUTSKernel(nuts_params))
 

@@ -2,8 +2,8 @@
 Functionality for monotonically increasing B-splines.
 """
 
+from collections.abc import Callable
 from functools import partial
-from typing import Callable
 
 import jax.numpy as jnp
 import numpy as np
@@ -131,7 +131,7 @@ class MIPSpline(Group):
             smooth=self.smooth,
             coef=self.coef,
             positive_coef=self.positive_coef,
-            **contents
+            **contents,
         )
 
     def _gibbs_kernels(self) -> list[GibbsKernel]:
@@ -187,7 +187,6 @@ class MIPSplineTE1(Group):
         Z: Array | None = None,
         knots: tuple[Array | None, Array | None] = (None, None),
     ) -> None:
-
         A = ps.BSplineBasis(
             x[0], nparam[0], order=order, name=name + "_A", knots=knots[0]
         )
@@ -259,7 +258,7 @@ class MIPSplineTE1(Group):
             coef=self.coef,
             positive_coef=self.positive_coef,
             smooth=self.smooth,
-            **contents
+            **contents,
         )
 
     def _gibbs_kernels(self) -> list[GibbsKernel]:

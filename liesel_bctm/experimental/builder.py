@@ -90,7 +90,7 @@ class ExperimentalCTMBuilder(CTMBuilder):
         )
         self.pt.append(mite_spline)
         self.add_groups(mite_spline)
-        mipsd = MITEDerivative(mite_spline, name=str_name + "_d")
+        mipsd = MITEDerivative(mite_spline, name=str_name + "_d")  # type: ignore
         self.ptd.append(mipsd)
 
         return self

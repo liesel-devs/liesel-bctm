@@ -1,4 +1,4 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 import liesel.goose as gs
 import numpy as np
@@ -173,7 +173,6 @@ class TestPartialConditionalPredictions:
     def test_partial_ctrans_trafo_teprod_full_and_x1_fixed(
         self, samples: dict[str, Array]
     ) -> None:
-
         with pytest.raises(ValueError, match="must be of equal shape or scalar"):
             ctmp = ConditionalPredictions(
                 samples, ctmb, trafo_teprod_full=(None, np.linspace(0, 1, 7)), x1=0.3
@@ -224,7 +223,6 @@ class TestPartialConditionalPredictions:
 
 class TestSummaryDataFrames:
     def test_summary_helper(self, samples: dict[str, Array]) -> None:
-
         q01 = sample_quantiles(samples, q=0.1)
         q50 = sample_quantiles(samples, q=0.5)
         q90 = sample_quantiles(samples, q=0.9)

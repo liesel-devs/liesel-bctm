@@ -22,7 +22,7 @@ class TestBuilder:
             ExperimentalCTMBuilder(data)
             .add_intercept()
             .add_pspline("x2", nparam=7, a=2.0, b=0.5, name="x")
-            .add_teprod_exp2("y", "x2", nparam=(7, 7), a=2.0, b=0.5, name="yx")
+            .add_teprod_exp2("y", "x2", nparam=(7, 7), a=2.0, b=0.5, name="yx")  # type: ignore
             .add_response("y")
         )
 
