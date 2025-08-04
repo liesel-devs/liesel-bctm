@@ -7,7 +7,7 @@ format: gfm
 
 `bctm` is a Python library for building Bayesian Conditional
 Transformation Models and sampling from their parameter's posterior distribution
-via MCMC. It is built on top of the probabilistic programming framework.
+via MCMC. It is built on top of the probabilistic programming framework Liesel.
 
 For more on Liesel, see
 
@@ -74,12 +74,12 @@ Now, we can build a model:
 
 
 ```{python}
-#| label: Build model
+# | label: Build model
 ctmb = (
     bctm.CTMBuilder(data)
     .add_intercept()
-    .add_trafo("y", nparam=15, a=2.0, b=0.5, name="y")
-    .add_pspline("x", nparam=15, a=2.0, b=0.5, name="x")
+    .add_trafo("y", nparam=15, a=1.0, b=0.001, name="y")
+    .add_pspline("x", nparam=15, a=1.0, b=0.001, name="x")
     .add_response("y")
 )
 
@@ -173,7 +173,8 @@ dist_df_wide <- dist_df |>
     pivot_wider(
         names_from = "summary",
         values_from = c("pdf", "cdf", "log_prob")
-    )
+    ) |>
+        rename(y = y0, x = x0)
 ```
 
 Next, it is time for our plot:
@@ -422,6 +423,6 @@ gs.plot_param(results, "y_igvar")
 ```
 
 ```{python}
-#| label: Diagnostic plots for variance of pspline
+# | label: Diagnostic plots for variance of pspline
 gs.plot_param(results, "x_igvar")
 ```
