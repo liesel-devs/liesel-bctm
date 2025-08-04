@@ -24,8 +24,5 @@ jobs:
       - name: Install package
         run: uv sync --locked --group dev
 
-      - name: Run pre-commit
-        run: uv run pre-commit run --all
-
       - name: Run pytest
-        run: pytest --run-mcmc
+        run: uv run pytest --run-mcmc
