@@ -3,7 +3,7 @@ title: "Bayesian Conditional Transformation Models in Liesel"
 format: gfm
 ---
 
-[![pre-commit](https://github.com/liesel-devs/liesel-ctm/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/liesel-devs/liesel-ctm/actions/workflows/pre-commit.yml) [![pytest](https://github.com/liesel-devs/liesel-ctm/actions/workflows/pytest.yml/badge.svg)](https://github.com/liesel-devs/liesel-ctm/actions/workflows/pytest.yml) [![pytest-cov](tests/coverage.svg)](https://github.com/liesel-devs/liesel-ctm/actions/workflows/pytest.yml)
+[![pre-commit](https://github.com/liesel-devs/liesel-bctm/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/liesel-devs/liesel-bctm/actions/workflows/pre-commit.yml) [![pytest](https://github.com/liesel-devs/liesel-bctm/actions/workflows/pytest.yml/badge.svg)](https://github.com/liesel-devs/liesel-bctm/actions/workflows/pytest.yml) [![pytest-cov](tests/coverage.svg)](https://github.com/liesel-devs/liesel-bctm/actions/workflows/pytest.yml)
 
 `bctm` is a Python library for building Bayesian Conditional
 Transformation Models and sampling from their parameter's posterior distribution
