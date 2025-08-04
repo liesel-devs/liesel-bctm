@@ -76,8 +76,15 @@ class MIPSpline(Group):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = softplus,
         Z: Array | None = None,
+        knot_boundaries: tuple[float, float] | None = None,
     ) -> None:
-        B = ps.BSplineBasisCentered(x, nparam=nparam, order=order, name=name + "_B")
+        B = ps.BSplineBasisCentered(
+            x,
+            nparam=nparam,
+            order=order,
+            name=name + "_B",
+            knot_boundaries=knot_boundaries,
+        )
         self.Z = Data(Z) if Z is not None else Data(constraints.ffzero(nparam))
         """Reparameterisation matrix for identifiability."""
 

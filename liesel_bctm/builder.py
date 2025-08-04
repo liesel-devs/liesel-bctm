@@ -271,6 +271,7 @@ class CTMBuilder(LieselDistRegBuilder):
         b: float,
         order: int = 3,
         name: str | None = None,
+        knot_boundaries: tuple[float, float] | None = None,
     ) -> CTMBuilder:
         """
         Adds a Bayesian P-spline smooth to the model builder.
@@ -299,7 +300,14 @@ class CTMBuilder(LieselDistRegBuilder):
         """
         str_name = self._pt_name(name, "pspline")
         pspline = ps.PSpline(
-            str_name, x=self._array(x), nparam=nparam, a=a, b=b, order=order, Z=None
+            str_name,
+            x=self._array(x),
+            nparam=nparam,
+            a=a,
+            b=b,
+            order=order,
+            Z=None,
+            knot_boundaries=knot_boundaries,
         )
 
         self.pt.append(pspline)
@@ -441,6 +449,7 @@ class CTMBuilder(LieselDistRegBuilder):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = jax.nn.softplus,
         name: str | None = None,
+        knot_boundaries: tuple[float, float] | None = None,
     ) -> CTMBuilder:
         """
         A monotonically increasing B-spline.
@@ -473,15 +482,21 @@ class CTMBuilder(LieselDistRegBuilder):
             also be used as prefix for all :class:`.Var`s in the smooth.
         """
         str_name = self._pt_name(name, "pspline_mi")
+        x_array = self._array(x)
+
+        xmin = x_array.min()
+        xmax = x_array.max()
+
         mi_pspline = mi.MIPSpline(
             str_name,
-            x=self._array(x),
+            x=x_array,
             nparam=nparam,
             a=a,
             b=b,
             order=order,
             Z=None,
             positive_tranformation=positive_tranformation,
+            knot_boundaries=(xmin, xmax),
         )
 
         self.pt.append(mi_pspline)
@@ -580,8 +595,10 @@ class CTMBuilder(LieselDistRegBuilder):
         order: int = 3,
         positive_tranformation: Callable[[Array], Array] = jax.nn.softplus,
         name: str | None = None,
+        knot_boundaries: tuple[float, float] | None = None,
     ) -> CTMBuilder:
         name = self._pt_name(name=name, prefix="trafo")
+
         self.add_pspline_mi(
             x=x,
             nparam=nparam,
@@ -590,6 +607,7 @@ class CTMBuilder(LieselDistRegBuilder):
             order=order,
             positive_tranformation=positive_tranformation,
             name=name,
+            knot_boundaries=knot_boundaries,
         )
         mips = self.groups()[name]
         if not isinstance(mips, mi.MIPSpline):

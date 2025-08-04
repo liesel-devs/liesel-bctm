@@ -386,9 +386,15 @@ class BSplineBasisCentered(BSplineBasis):
         nparam: int,
         order: int = 3,
         name: str = "",
+        knot_boundaries: tuple[float, float] | None = None,
     ) -> None:
         # TODO: Make sure this is correct after update to liesel-internal
-        knots = kn(value, order=order, n_params=nparam)
+
+        if knot_boundaries is None:
+            knots = kn(value, order=order, n_params=nparam)
+        else:
+            knots = kn(jnp.asarray(knot_boundaries), order=order, n_params=nparam)
+
         B = SplineDesign(value, knots=knots, order=order)
         colmeans = B.mean(axis=0)
         Bc = B - colmeans
@@ -594,8 +600,14 @@ class PSpline(Group):
         b: float,
         order: int = 3,
         Z: Array | None = None,
+        knot_boundaries: tuple[float, float] | None = None,
     ) -> None:
-        B = BSplineBasis(x, nparam=nparam, order=order, name=name + "_B")
+        if knot_boundaries is None:
+            knots = kn(x, order=order, n_params=nparam)
+        else:
+            knots = kn(jnp.asarray(knot_boundaries), order=order, n_params=nparam)
+
+        B = BSplineBasis(x, nparam=nparam, order=order, name=name + "_B", knots=knots)
         self.Z = Data(Z) if Z is not None else Data(constraints.sumzero(B.value))
         """Reparameterisation matrix for identifiability."""
 
