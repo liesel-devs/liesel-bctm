@@ -18,13 +18,6 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install liesel
-        run: pip install git+https://github.com/liesel-devs/liesel.git
-
-      - name: Install liesel-internal
-        run: |
-          pip install git+https://jobrachem:${{ secrets.ACCESS_LIESEL_INTERNAL }}@github.com/liesel-devs/liesel-internal.git@main
-
       - name: Install package
         run: uv sync --locked --group dev
 
