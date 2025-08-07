@@ -484,8 +484,6 @@ class CTMBuilder(LieselDistRegBuilder):
         str_name = self._pt_name(name, "pspline_mi")
         x_array = self._array(x)
 
-        xmin = x_array.min()
-        xmax = x_array.max()
 
         mi_pspline = mi.MIPSpline(
             str_name,
@@ -496,7 +494,7 @@ class CTMBuilder(LieselDistRegBuilder):
             order=order,
             Z=None,
             positive_tranformation=positive_tranformation,
-            knot_boundaries=(xmin, xmax),
+            knot_boundaries=knot_boundaries,
         )
 
         self.pt.append(mi_pspline)
