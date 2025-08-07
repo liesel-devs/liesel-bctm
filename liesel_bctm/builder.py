@@ -484,7 +484,6 @@ class CTMBuilder(LieselDistRegBuilder):
         str_name = self._pt_name(name, "pspline_mi")
         x_array = self._array(x)
 
-
         mi_pspline = mi.MIPSpline(
             str_name,
             x=x_array,
