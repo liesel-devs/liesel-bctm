@@ -32,11 +32,11 @@ def _check_b_spline_inputs(x: Array, knots: Array, order: int) -> None:
         raise ValueError("Order must non-negative")
     if not _check_equidistant_knots(knots):
         raise ValueError("Sorted knots are not equidistant")
-    if not _check_data_range(x, knots, order):
-        raise ValueError(
-            f"Data values are not in the range \
-                [{knots[order]}, {knots[knots.shape[0] - order - 1]}]"
-        )
+    # if not _check_data_range(x, knots, order):
+    #     raise ValueError(
+    #         f"Data values are not in the range \
+    #             [{knots[order]}, {knots[knots.shape[0] - order - 1]}]"
+    #     )
 
 
 # @jit

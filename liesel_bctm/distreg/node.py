@@ -117,12 +117,12 @@ class Lin(Group):
         coef_samples = samples[self.coef.name]
         if x is None:
             X = self.x.value
-        elif len(np.shape(x)) >= 2:
+        elif len(jnp.shape(x)) >= 2:
             X = x
-        elif len(np.shape(x)) <= 1:
-            X = np.atleast_2d(x).T
-        smooth = np.tensordot(X, coef_samples, axes=([1], [-1]))
-        return np.moveaxis(smooth, 0, -1)
+        elif len(jnp.shape(x)) <= 1:
+            X = jnp.atleast_2d(x).T
+        smooth = jnp.tensordot(X, coef_samples, axes=([1], [-1]))
+        return jnp.moveaxis(smooth, 0, -1)
 
 
 class LinConst(Group):

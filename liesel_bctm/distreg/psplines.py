@@ -360,7 +360,7 @@ class BSplineBasis(Var):
         """
         if value is None:
             return self.value
-        value = np.atleast_1d(np.array(value, dtype=np.float32))
+        value = jnp.atleast_1d(jnp.array(value))
         return SplineDesign(value, knots=self.knots, order=self.order) @ self.Z
 
     def d(self, value: Array | float | None = None) -> Array:
@@ -430,27 +430,42 @@ class BSplineBasisCentered(BSplineBasis):
         return (X - self.colmeans) @ self.Z
 
 
-_kron_rowwise_helper = jax.vmap(jnp.kron, (0, 0), 0)
+# Two helpers: pairwise rows vs. rowwise with a constant second arg
+_kron_pairwise = jax.vmap(jnp.kron, in_axes=(0, 0), out_axes=0)
+_kron_const_b = jax.vmap(jnp.kron, in_axes=(0, None), out_axes=0)
 
 
-def kron_rowwise(a: Array, b: Array):
-    try:
-        return _kron_rowwise_helper(a, b)
-    except ValueError as e:
-        if len(b) == 1 and b == 1:
-            return a
-        raise e
+def kron_rowwise(a, b):
+    a = jnp.asarray(a)
+    b = jnp.asarray(b)
+
+    # Expected: a.shape == (N, A)
+    if b.ndim == 2 and b.shape[0] == 1:
+        # (1, B) → broadcast row to all rows of a
+        return _kron_const_b(a, b[0])
+    elif b.ndim == 1:
+        # (B,) → also treat as constant across rows
+        return _kron_const_b(a, b)
+    elif b.ndim == 2 and b.shape[0] == a.shape[0]:
+        # (N, B) → pairwise rows
+        return _kron_pairwise(a, b)
+    else:
+        raise ValueError(
+            f"Unsupported shapes: a{a.shape}, b{b.shape}. "
+            "b must be (N, B), (1, B), or (B,)."
+        )
 
 
 def _assert_shape(a, b):
     a_shape = 1 if isinstance(a, float) else a.shape
     b_shape = 1 if isinstance(b, float) else b.shape
 
-    if not a_shape == b_shape:
-        raise ValueError(
-            "The two arrays must be of equal shape or scalar. Got"
-            f" a.shape={a.shape} and b.shape={b.shape}."
-        )
+    if jnp.asarray(a).shape and jnp.asarray(b).shape:
+        if not a_shape == b_shape:
+            raise ValueError(
+                "The two arrays must be of equal shape or scalar. Got"
+                f" a.shape={a.shape} and b.shape={b.shape}."
+            )
 
 
 class TPBasis(Var):
@@ -607,6 +622,9 @@ class PSpline(Group):
         else:
             knots = kn(jnp.asarray(knot_boundaries), order=order, n_params=nparam)
 
+        self._min_x = knots[order]
+        self._max_x = knots[-order]
+
         B = BSplineBasis(x, nparam=nparam, order=order, name=name + "_B", knots=knots)
         self.Z = Data(Z) if Z is not None else Data(constraints.sumzero(B.value))
         """Reparameterisation matrix for identifiability."""
@@ -639,6 +657,9 @@ class PSpline(Group):
         super().__init__(
             name, Z=self.Z, X=self.X, smooth=self.smooth, coef=self.coef, **contents
         )
+
+    def xgrid(self, num: int = 100) -> Array:
+        return jnp.linspace(self._min_x, self._max_x, num)
 
     def _gibbs_kernels(self) -> list[GibbsKernel]:
         var_kernel = gibbs.igvar_gibbs_kernel(self)
@@ -772,5 +793,5 @@ def ppeval(
     """
     coef_samples = samples[group.coef.name]
     X = group.X.bs(x)
-    smooth = np.tensordot(X, coef_samples, axes=([1], [-1]))
-    return np.moveaxis(smooth, 0, -1)
+    smooth = jnp.tensordot(X, coef_samples, axes=([1], [-1]))
+    return jnp.moveaxis(smooth, 0, -1)

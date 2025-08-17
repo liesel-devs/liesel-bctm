@@ -5,9 +5,12 @@ from functools import cache, cached_property
 from itertools import product
 from pathlib import Path
 
+import jax
+import jax.numpy as jnp
 import liesel.goose as gs
 import numpy as np
 import pandas as pd
+import tensorflow_probability.substrates.jax.distributions as tfd
 
 from .builder import CTMBuilder
 from .custom_types import Array
@@ -91,12 +94,12 @@ class ConditionalPredictions:
     ) -> Array:
         """Handles broadcasting to correct shapes and summing up."""
 
-        shape = np.broadcast_shapes(*[smooth.shape for smooth in smooths])
-        smooths = [np.broadcast_to(smooth, shape) for smooth in smooths]
+        shape = jnp.broadcast_shapes(*[smooth.shape for smooth in smooths])
+        smooths = [jnp.broadcast_to(smooth, shape) for smooth in smooths]
 
-        smooth = np.sum(smooths, axis=0)
-        smooth = np.moveaxis(smooth, 0, -1) if np.shape(smooth) else smooth
-        return np.array(intercept + smooth)
+        smooth = jnp.sum(jnp.c_[smooths], axis=0)
+        smooth = jnp.moveaxis(smooth, 0, -1) if jnp.shape(smooth) else smooth
+        return jnp.array(intercept + smooth)
 
     @cache
     def intercept(self) -> Array:
@@ -200,6 +203,509 @@ class ConditionalPredictions:
         """
         z = self.ctrans()
         return self.refdist.cdf(z)
+
+
+def approximate_inverse_(y, z, znew):
+    """
+    Given a grid of ``f(y) = z``, this returns an approximation of ``f^-1(znew) = ynew``
+    by finding the closest grid point to each element of znew and interpolating
+    linearly between the two closest grid points.
+    """
+    i = jnp.searchsorted(z, znew, side="right") - 1
+    lo, hi = z[i], z[i + 1]
+    step = hi - lo
+    k = (znew - lo) / step
+    k = jnp.where(jnp.isinf(k), 1.0, k)
+    approx_y_new = (1.0 - k) * y[i] + (k * y[i + 1])
+    return approx_y_new
+
+
+def _flatten_first_two_sample_dims(samples_pytree):
+    """[S, C, ...] -> [S*C, ...] for every leaf in the PyTree."""
+    leaves, treedef = jax.tree_util.tree_flatten(samples_pytree)
+    S, C = leaves[0].shape[:2]
+
+    def reshape(x):
+        return x.reshape((S * C,) + x.shape[2:])
+
+    return jax.tree_util.tree_unflatten(treedef, [reshape(x) for x in leaves]), (S * C)
+
+
+def ctrans_inverse(
+    z: Array,
+    samples: dict[str, Array],
+    smooths_list: list[dict[str, Array]],
+    ygrid: Array,
+    builder: CTMBuilder,
+) -> Array:
+    """
+    Compute the inverse conditional transformation for a set of covariate combinations.
+
+    Parameters
+    ----------
+    z : Array
+        Array of shape (N,). Target values in the transformed (z) space for which to
+        compute the inverse transformation.
+    samples : dict[str, Array]
+        Dictionary of posterior samples. Each value is an array of shape (C, S) or (C,
+        S, D), where C is the number of chains and S is the number of samples.
+    smooths_list : list[dict[str, Array]]
+        List of length N, where each element is a dictionary of smooth values for a
+        particular covariate combination. Each array in the dictionary has shape (M, K),
+        with M being the length of ygrid and K the dimension of the smooth.
+    ygrid : Array
+        Array of shape (M,). Grid of response values over which the transformation is
+        evaluated.
+    builder : CTMBuilder
+        Model builder used to construct the conditional transformation.
+
+    Returns
+    -------
+    Array
+        Array of shape (C, S, N). For each chain, sample, and covariate combination,
+        returns the inverse transformation value in the response space.
+
+    Raises
+    ------
+    ValueError
+        If the size of z does not match the length of smooths_list.
+
+    Notes
+    -----
+    - Each element of z corresponds to one element of smooths_list.
+    - The function uses JAX's vmap for efficient vectorized computation over samples and
+      covariate combinations.
+    """
+    if z.size != len(smooths_list):
+        raise ValueError(
+            "Each element of z has to correspond to an element of the smooths list."
+        )
+
+    leaves, _ = jax.tree_util.tree_flatten(samples)
+    C, S = leaves[0].shape[:2]
+
+    # Elements now have shape (C*S, ...)
+    samples_flat, _ = _flatten_first_two_sample_dims(samples)
+
+    def _one_case(z, sample, **smooths):
+        """
+        For one z, for one sample
+        """
+        sample_expanded = {k: jnp.expand_dims(v, (0, 1)) for k, v in sample.items()}
+        ctmp_case = ConditionalPredictions(sample_expanded, builder, **smooths)
+        z_eval = ctmp_case.ctrans().squeeze()
+        ynew = approximate_inverse_(ygrid, z_eval, z)
+        return ynew
+
+    # --- step 1: (prepare) stack smooths_list so we can vmap over N ---
+    # smooths_stacked is a dict where each value has shape (N, M, K)
+    smooths_stacked = jax.tree_util.tree_map(
+        lambda *xs: jnp.stack(xs, axis=0), *smooths_list
+    )
+
+    # Helper: for fixed z_i and smooths_i, map over the (C*S,) samples
+    def _per_z(z_i, smooths_i):
+        # vmap over the leading (C*S) dimension of the samples tree
+        y_vec = jax.vmap(lambda sample: _one_case(z_i, sample, **smooths_i))(
+            samples_flat
+        )  # (C*S,)
+        return y_vec.reshape(C, S)  # (C, S)
+
+    # --- step 2: map over elements of z and smooths (length N) ---
+    # in_axes=(0, 0): z over axis 0, and each leaf in smooths_stacked over axis 0
+    csn = jax.vmap(_per_z, in_axes=(0, 0))(z, smooths_stacked)  # (N, C, S)
+
+    # --- step 3: return values with shape (C, S, N) ---
+    return jnp.transpose(csn, (1, 2, 0))
+
+
+def ctrans_inverse2(
+    z: Array,  # (C, S, N)
+    samples: dict[str, Array],  # leaves have shape (C, S) or (C, S, D)
+    smooths_list: list[dict[str, Array]],  # length N, each leaf (M, K)
+    ygrid: Array,  # (M,)
+    builder: CTMBuilder,
+) -> Array:
+    """
+    Compute the inverse conditional transformation for a set of covariate combinations.
+
+    Parameters
+    ----------
+    z : Array
+        Array of shape (C, S, N). Target values in the transformed (z) space for which
+        to compute the inverse transformation.
+    samples : dict[str, Array]
+        Dictionary of posterior samples. Each value is an array of shape (C, S) or (C,
+        S, D), where C is the number of chains and S is the number of samples.
+    smooths_list : list[dict[str, Array]]
+        List of length N, where each element is a dictionary of smooth values for a
+        particular covariate combination. Each array in the dictionary has shape (M, K),
+        with M being the length of ygrid and K the dimension of the smooth.
+    ygrid : Array
+        Array of shape (M,). Grid of response values over which the transformation is
+        evaluated.
+    builder : CTMBuilder
+        Model builder used to construct the conditional transformation.
+
+    Returns
+    -------
+    Array
+        Array of shape (C, S, N). For each chain, sample, and covariate combination,
+        returns the inverse transformation value in the response space.
+
+    Raises
+    ------
+    ValueError
+        If the size of z (last axis) does not match the length of smooths_list.
+
+    Notes
+    -----
+    - Each element of z corresponds to one element of smooths_list (last axis of z) and
+      one sample.
+    - The function uses JAX's vmap for efficient vectorized computation over samples and
+      covariate combinations.
+    """
+    # --- validate shapes ---
+    if len(smooths_list) == 0:
+        raise ValueError("smooths_list must be non-empty.")
+    if z.ndim != 3:
+        raise ValueError("z must have shape (C, S, N).")
+    C_z, S_z, N = z.shape
+
+    leaves, _ = jax.tree_util.tree_flatten(samples)
+    C_samp, S_samp = leaves[0].shape[:2]
+    if (C_z, S_z) != (C_samp, S_samp):
+        raise ValueError(
+            f"z first two dims {(C_z, S_z)} must match "
+            "samples first two dims {(C_samp, S_samp)}."
+        )
+    if N != len(smooths_list):
+        raise ValueError(
+            f"z third dim N={N} must equal len(smooths_list)={len(smooths_list)}."
+        )
+
+    # --- stack smooths so we can vmap over N ---
+    # smooths_stacked: dict with leaves shape (N, M, K)
+    smooths_stacked = jax.tree_util.tree_map(
+        lambda *xs: jnp.stack(xs, axis=0), *smooths_list
+    )
+
+    # --- flatten samples to (C*S, ...) to vmap over each (c, s) pair ---
+    # samples_flat has leading dim CS = C*S
+    samples_flat, _ = _flatten_first_two_sample_dims(samples)  # leaves (C*S, ...)
+
+    CS = C_samp * S_samp
+    z_flat = z.reshape(CS, N)  # (C*S, N)
+
+    def _per_sample(sample, z_vec):
+        """
+        For a single (c, s) sample and its z_vec over N, compute y over N.
+        """
+        # Expand to fake (C, S) batch dims expected by ConditionalPredictions
+        sample_expanded = {k: jnp.expand_dims(v, (0, 1)) for k, v in sample.items()}
+
+        def _one_n(z_n, smooths_n):
+            ctmp_case = ConditionalPredictions(sample_expanded, builder, **smooths_n)
+            z_eval = ctmp_case.ctrans().squeeze()  # (M,)
+            ynew = approximate_inverse_(ygrid, z_eval, z_n)  # scalar
+            return ynew
+
+        # Map over N: (z_n, smooths_n) -> y_n
+        y_over_n = jax.vmap(_one_n, in_axes=(0, 0))(z_vec, smooths_stacked)  # (N,)
+        return y_over_n
+
+    # vmap over (C*S) samples
+    ys_flat = jax.vmap(_per_sample, in_axes=(0, 0))(samples_flat, z_flat)  # (C*S, N)
+
+    # reshape back to (C, S, N)
+    return ys_flat.reshape(C_samp, S_samp, N)
+
+
+def trafo_one_cquantile(
+    q: float | Array,
+    samples: dict[str, Array],  # leaves have shape (C, S) or (C, S, D)
+    smooths_list: list[dict[str, Array]],  # length N, each leaf (M, K)
+    ygrid: Array,  # (M,)
+    builder: CTMBuilder,
+) -> Array:
+    """
+    Compute the conditional quantile for a given probability level using the
+    transformation model.
+
+    Parameters
+    ----------
+    q : float or Array
+        Quantile level(s) in (0, 1) for which to compute the conditional quantile(s).
+    samples : dict[str, Array]
+        Dictionary of posterior samples. Each value is an array of shape (C, S) or (C,
+        S, D), where C is the number of chains and S is the number of samples.
+    smooths_list : list[dict[str, Array]]
+        List of length N, where each element is a dictionary of smooth values for a
+        particular covariate combination. Each array in the dictionary has shape (M, K),
+        with M being the length of ygrid and K the dimension of the smooth.
+    ygrid : Array
+        Array of shape (M,). Grid of response values over which the transformation is
+        evaluated.
+    builder : CTMBuilder
+        Model builder used to construct the conditional transformation.
+
+    Returns
+    -------
+    Array
+        Array of shape (C, S, N). For each chain, sample, and covariate combination,
+        returns the conditional quantile value in the response space.
+
+    Notes
+    -----
+    - The quantile is computed by transforming the requested probability level `q` to
+      the standard normal space and then inverting the transformation using the model.
+    - Each element of the output corresponds to one covariate combination in
+      `smooths_list`.
+    """
+    N = len(smooths_list)
+    z = tfd.Normal(loc=0.0, scale=1.0).quantile(q)
+    z = jnp.full((N,), fill_value=z)
+    return ctrans_inverse(z, samples, smooths_list, ygrid, builder)
+
+
+def trafo_cquantiles(
+    q: Array,  # shape (Q,)
+    samples: dict[str, Array],  # leaves have shape (C, S) or (C, S, D)
+    smooths_list: list[dict[str, Array]],  # length N, each leaf (M, K)
+    ygrid: Array,  # (M,)
+    builder: CTMBuilder,
+) -> Array:
+    """
+    Compute conditional quantiles for multiple probability levels using the
+    transformation model.
+
+    Parameters
+    ----------
+    q : Array
+        Array of shape (Q,). Quantile levels in (0, 1) for which to compute the
+        conditional quantiles.
+    samples : dict[str, Array]
+        Dictionary of posterior samples. Each value is an array of shape (C, S) or (C,
+        S, D), where C is the number of chains and S is the number of samples.
+    smooths_list : list[dict[str, Array]]
+        List of length N, where each element is a dictionary of smooth values for a
+        particular covariate combination. Each array in the dictionary has shape (M, K),
+        with M being the length of ygrid and K the dimension of the smooth.
+    ygrid : Array
+        Array of shape (M,). Grid of response values over which the transformation is
+        evaluated.
+    builder : CTMBuilder
+        Model builder used to construct the conditional transformation.
+
+    Returns
+    -------
+    Array
+        Array of shape (Q, C, S, N). For each quantile level, chain, sample, and
+        covariate combination, returns the conditional quantile value in the response
+        space.
+
+    Raises
+    ------
+    ValueError
+        If `q` does not have shape (Q,).
+
+    Notes
+    -----
+    - The function iterates over each quantile level in `q` and computes the
+      corresponding conditional quantile using `trafo_one_cquantile`.
+    - The output is stacked along the first axis (quantile levels).
+    """
+    if not len(q.shape) == 1:
+        raise ValueError("q must have shape (Q,)")
+
+    results = []
+    for i in range(q.shape[0]):
+        ynew = trafo_one_cquantile(q[i], samples, smooths_list, ygrid, builder)
+        results.append(ynew)
+
+    ynew = jnp.c_[results]
+    return ynew
+
+
+def trafo_csample(
+    key,
+    n: int,
+    samples: dict[str, Array],  # leaves have shape (C, S) or (C, S, D)
+    smooths_list: list[dict[str, Array]],  # length N, each leaf (M, K)
+    ygrid: Array,  # (M,)
+    builder: CTMBuilder,
+) -> Array:
+    """
+    Draw random samples from the conditional distribution using the transformation
+    model.
+
+    Parameters
+    ----------
+    key
+        PRNG key for random number generation (JAX).
+    n : int
+        Number of random samples to draw.
+    samples : dict[str, Array]
+        Dictionary of posterior samples. Each value is an array of shape (C, S) or (C,
+        S, D), where C is the number of chains and S is the number of samples.
+    smooths_list : list[dict[str, Array]]
+        List of length N, where each element is a dictionary of smooth values for a
+        particular covariate combination. Each array in the dictionary has shape (M, K),
+        with M being the length of ygrid and K the dimension of the smooth.
+    ygrid : Array
+        Array of shape (M,). Grid of response values over which the transformation is
+        evaluated.
+    builder : CTMBuilder
+        Model builder used to construct the conditional transformation.
+
+    Returns
+    -------
+    Array
+        Array of shape (n, C, S, N). For each sample, chain, posterior draw, and
+        covariate combination, returns a random draw from the conditional distribution
+        in the response space.
+
+    Notes
+    -----
+    - Uniform random samples are drawn and transformed to the standard normal space,
+      then inverted using the model.
+    - The output is stacked along the first axis (sample index).
+    """
+    leaves, _ = jax.tree_util.tree_flatten(samples)
+    C_samp, S_samp = leaves[0].shape[:2]
+    N = len(smooths_list)
+
+    u = tfd.Uniform(low=0.0, high=1.0).sample((n, C_samp, S_samp, N), seed=key)
+    z = tfd.Normal(loc=0.0, scale=1.0).quantile(u)
+    results = []
+    for i in range(n):
+        ynew = ctrans_inverse2(z[i, ...], samples, smooths_list, ygrid, builder)
+        results.append(ynew)
+
+    ynew = jnp.c_[results]
+    return ynew
+
+
+def quantile_score(y_true: Array, y_pred_q: Array, tau: Array) -> Array:
+    """
+    Compute the mean pinball loss (quantile score) per MCMC draw and quantile.
+
+    Parameters
+    ----------
+    y_true : Array
+        Array of shape (N,). True response values.
+    y_pred_q : Array
+        Array of shape (C, S, N, Q). Predicted quantiles for each chain, sample,
+        observation, and quantile level.
+    tau : Array
+        Array of shape (Q,). Quantile levels in (0, 1).
+
+    Returns
+    -------
+    Array
+        Array of shape (C, S, Q). Mean pinball loss over observations for each chain,
+        sample, and quantile level.
+
+    Notes
+    -----
+    - The pinball loss is computed for each MCMC draw and quantile level, then averaged
+      over observations.
+    - The function uses JAX's vmap and lax.scan for efficient computation.
+    """
+    y_true = jnp.asarray(y_true)  # (N,)
+    tau = jnp.asarray(tau)  # (Q,)
+
+    C, S, N, Q = y_pred_q.shape
+    y_pred_q = jnp.reshape(y_pred_q, (C * S, N, Q))
+
+    def per_draw(pred_m: Array) -> Array:
+        # pred_m: (N, Q) for one MCMC draw
+        def body(carry, i):
+            diff = y_true[i] - pred_m[i]  # (Q,)
+            contrib = jnp.where(diff >= 0, tau * diff, (tau - 1.0) * diff)  # (Q,)
+            return carry + contrib, None
+
+        init = jnp.zeros_like(tau)
+        total, _ = jax.lax.scan(body, init, jnp.arange(y_true.shape[0]))
+        return total / y_true.shape[0]  # (Q,)
+
+    quantile_score = 2 * jax.vmap(per_draw)(y_pred_q)  # (M, Q)
+
+    return quantile_score
+
+
+def quantile_score_df(y_true: Array, y_pred_q: Array, tau: Array):
+    """
+    Compute a summary DataFrame of mean and standard deviation of quantile scores.
+
+    Parameters
+    ----------
+    y_true : Array
+        Array of shape (N,). True response values.
+    y_pred_q : Array
+        Array of shape (C, S, N, Q). Predicted quantiles for each chain, sample,
+        observation, and quantile level.
+    tau : Array
+        Array of shape (Q,). Quantile levels in (0, 1).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns: - 'quantile_score_mean': Mean quantile score for each
+        quantile level (averaged over chains and samples). - 'quantile_score_sd':
+        Standard deviation of quantile score for each quantile level. - 'prob': Quantile
+        levels (tau).
+
+    Notes
+    -----
+    - Uses `quantile_score` to compute the pinball loss for each chain, sample, and
+      quantile level.
+    - Aggregates results by mean and standard deviation over chains and samples.
+    """
+    qs = quantile_score(y_true, y_pred_q, tau)
+    mean_quantile_score = jnp.mean(qs, axis=(0))  # mean over samples
+
+    quantile_score_std = jnp.std(qs, axis=(0))  # std over samples
+
+    quantile_score_df = pd.DataFrame(
+        {
+            "quantile_score_mean": mean_quantile_score,
+            "quantile_score_sd": quantile_score_std,
+            "prob": tau.squeeze(),
+        }
+    )
+
+    return quantile_score_df
+
+
+def crps(y_true: Array, y_pred_q: Array, tau: Array):
+    """
+    Compute the mean continuous ranked probability score (CRPS) over all samples and
+    quantile levels.
+
+    Parameters
+    ----------
+    y_true : Array
+        Array of shape (N,). True response values.
+    y_pred_q : Array
+        Array of shape (C, S, N, Q). Predicted quantiles for each chain, sample,
+        observation, and quantile level.
+    tau : Array
+        Array of shape (Q,). Quantile levels in (0, 1).
+
+    Returns
+    -------
+    float
+        Mean CRPS value, averaged over all chains, samples, and quantile levels.
+
+    Notes
+    -----
+    - Uses `quantile_score` to compute the pinball loss for each chain, sample, and
+      quantile level.
+    - Returns the mean value over all dimensions of the quantile score array.
+    """
+    qs = quantile_score(y_true, y_pred_q, tau)
+    return qs.mean()
 
 
 def summarise_samples(

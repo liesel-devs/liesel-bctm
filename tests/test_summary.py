@@ -1,5 +1,7 @@
 from collections.abc import Iterator
 
+import jax
+import jax.numpy as jnp
 import liesel.goose as gs
 import numpy as np
 import pytest
@@ -10,15 +12,21 @@ from liesel_bctm.summary import (
     cdist_quantiles,
     cdist_quantiles_early,
     cdist_rsample,
+    ctrans_inverse,
+    ctrans_inverse2,
     grid,
     partial_ctrans_df_early,
     partial_ctrans_quantiles,
     partial_ctrans_rsample,
     sample_dgf,
     sample_quantiles,
+    trafo_cquantiles,
+    trafo_csample,
+    trafo_one_cquantile,
 )
 
 from .files.run_model import ctmb
+from .files.run_model import y as yinput
 
 # components: "trafo_teprod_full", "x1", "intercept"
 
@@ -90,6 +98,126 @@ class TestConditionalPredictionsLantentVariable:
         )
         z2 = ctmp.ctrans_d()
         assert np.allclose(z1, z2)
+
+
+class TestCtransInverse:
+    def test_function_runs(self, samples):
+        z = jnp.array([0.0, 0.5])
+        ygrid = jnp.linspace(yinput.min(), yinput.max(), 10)
+        x1 = jnp.array([0.0, 1.0])
+        x2 = jnp.array([1.0, 0.0])
+
+        smooths_list = []
+        for i in range(z.size):
+            smooths = {
+                "trafo_teprod_full": (ygrid, jnp.asarray(x2[i])),
+                "x1": jnp.asarray(x1[i]),
+            }
+            smooths_list.append(smooths)
+
+        ynew = ctrans_inverse(
+            z=z, samples=samples, smooths_list=smooths_list, ygrid=ygrid, builder=ctmb
+        )
+
+        assert not jnp.any(jnp.isnan(ynew))
+        assert ynew.shape == (2, 1000, 2)
+
+    def test_function_runs_correctly(self, samples):
+        yold = np.linspace(0, 1, 10)
+        ctmp = ConditionalPredictions(
+            samples, ctmb, trafo_teprod_full=(yold, 0.0), x1=0.0
+        )
+        z = ctmp.ctrans()
+
+        ygrid = jnp.linspace(yinput.min(), yinput.max(), 500)
+        x1 = jnp.array([0.0])
+        x2 = jnp.array([0.0])
+        x2 = jnp.zeros(10)
+
+        smooths_list = []
+        for i in range(z.shape[-1]):
+            smooths = {
+                "trafo_teprod_full": (ygrid, jnp.asarray(x2[i])),
+                "x1": jnp.asarray(x1[i]),
+            }
+            smooths_list.append(smooths)
+
+        ynew = ctrans_inverse2(
+            z=z, samples=samples, smooths_list=smooths_list, ygrid=ygrid, builder=ctmb
+        )
+
+        for c in range(2):
+            for s in range(1000):
+                assert jnp.allclose(ynew[c, s, :], yold, atol=1e-4)
+
+    def test_trafo_one_cquantile(self, samples):
+        ygrid = jnp.linspace(yinput.min(), yinput.max(), 500)
+        x1 = jnp.array([0.0])
+        x2 = jnp.array([0.0])
+        x2 = jnp.zeros(10)
+
+        smooths_list = []
+        for i in range(10):
+            smooths = {
+                "trafo_teprod_full": (ygrid, jnp.asarray(x2[i])),
+                "x1": jnp.asarray(x1[i]),
+            }
+            smooths_list.append(smooths)
+
+        ynew = trafo_one_cquantile(
+            q=0.5, samples=samples, smooths_list=smooths_list, ygrid=ygrid, builder=ctmb
+        )
+
+        assert ynew.shape == (2, 1000, 10)
+        assert not jnp.any(jnp.isnan(ynew))
+
+    def test_trafo_cquantiles(self, samples):
+        ygrid = jnp.linspace(yinput.min(), yinput.max(), 500)
+        x1 = jnp.array([0.0])
+        x2 = jnp.array([0.0])
+        x2 = jnp.zeros(10)
+
+        smooths_list = []
+        for i in range(10):
+            smooths = {
+                "trafo_teprod_full": (ygrid, jnp.asarray(x2[i])),
+                "x1": jnp.asarray(x1[i]),
+            }
+            smooths_list.append(smooths)
+
+        q = jnp.linspace(0.2, 0.8, 5)
+        ynew = trafo_cquantiles(
+            q=q, samples=samples, smooths_list=smooths_list, ygrid=ygrid, builder=ctmb
+        )
+
+        assert ynew.shape == (5, 2, 1000, 10)
+        assert not jnp.any(jnp.isnan(ynew))
+
+    def test_trafo_csample(self, samples):
+        ygrid = jnp.linspace(yinput.min(), yinput.max(), 500)
+        x1 = jnp.array([0.0])
+        x2 = jnp.array([0.0])
+        x2 = jnp.zeros(10)
+
+        smooths_list = []
+        for i in range(10):
+            smooths = {
+                "trafo_teprod_full": (ygrid, jnp.asarray(x2[i])),
+                "x1": jnp.asarray(x1[i]),
+            }
+            smooths_list.append(smooths)
+
+        ynew = trafo_csample(
+            key=jax.random.key(1),
+            n=3,
+            samples=samples,
+            smooths_list=smooths_list,
+            ygrid=ygrid,
+            builder=ctmb,
+        )
+
+        assert ynew.shape == (3, 2, 1000, 10)
+        assert not jnp.any(jnp.isnan(ynew))
 
 
 class TestConditionalPredictionsDist:

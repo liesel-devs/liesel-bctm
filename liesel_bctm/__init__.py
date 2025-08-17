@@ -12,6 +12,8 @@ from .summary import (
     sample_means,
     sample_quantiles,
     summarise_samples,
+    trafo_cquantiles,
+    trafo_csample,
 )
 
 __all__ = [
@@ -30,4 +32,6 @@ __all__ = [
     "sample_means",
     "summarise_samples",
     "cache_results",
+    "trafo_cquantiles",
+    "trafo_csample",
 ]
