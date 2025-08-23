@@ -243,18 +243,19 @@ class RandomIntercept(Lin):
     def __init__(self, x: Array, tau: Var, name: str) -> None:
         self.label_binarizer = LabelBinarizer()
         self.label_binarizer.fit(x)
+
         self.x = Var.new_obs(x, name=f"{name}_covariate")
         self.basis_fn = self.label_binarizer.transform
         self.basis = Data(self.basis_fn(x), _name=f"{name}_basis")
         self.tau = tau
 
-        prior = Dist(tfd.Normal, loc=0.0, scale=1.0)
+        prior = Dist(tfd.Normal, loc=0.0, scale=self.tau)
         self.coef = Var.new_param(
             np.zeros(self.basis.value.shape[-1]), prior, name=f"{name}_coef"
         )
 
         self.smooth = Var(
-            ScaledDot(x=self.basis, coef=self.coef, scale=self.tau),
+            ScaledDot(x=self.basis, coef=self.coef, scale=Var(1.0)),
             name=f"{name}_smooth",
         )
 
@@ -299,19 +300,28 @@ class RandomIntercept(Lin):
 
         return kernels
 
+    # def ppeval(self, samples: dict, x: Array | None = None) -> Array:
+    #     coef_samples = samples[self.coef.name]
+    #     coef_samples = jnp.atleast_3d(coef_samples)
+
+    #     scale_samples = self.tau.predict(samples)
+    #     scale_samples = jnp.atleast_3d(scale_samples)
+
+    #     scaled_coef_samples = scale_samples * coef_samples
+
+    #     X = self.basis_fn(x)
+
+    #     smooth = jnp.tensordot(X, scaled_coef_samples, axes=([1], [-1]))
+    #     return jnp.moveaxis(smooth, 0, -1)
+
     def ppeval(self, samples: dict, x: Array | None = None) -> Array:
         coef_samples = samples[self.coef.name]
-        coef_samples = np.atleast_3d(coef_samples)
-
-        scale_samples = self.tau.predict(samples)
-        scale_samples = np.atleast_3d(scale_samples)
-
-        scaled_coef_samples = scale_samples * coef_samples
-
-        X = self.basis_fn(x)
-
-        smooth = np.tensordot(X, scaled_coef_samples, axes=([1], [-1]))
-        return np.moveaxis(smooth, 0, -1)
+        coef_samples = jnp.atleast_3d(coef_samples)
+        if x is None:
+            x = self.basis.value
+        
+        smooth = jnp.tensordot(x, coef_samples, axes=([1], [-1]))
+        return jnp.moveaxis(smooth, 0, -1)
 
 
 def sumzero(nparam: int) -> Array:
