@@ -319,7 +319,7 @@ class RandomIntercept(Lin):
         coef_samples = jnp.atleast_3d(coef_samples)
         if x is None:
             x = self.basis.value
-        
+
         smooth = jnp.tensordot(x, coef_samples, axes=([1], [-1]))
         return jnp.moveaxis(smooth, 0, -1)
 
