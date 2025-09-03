@@ -425,7 +425,7 @@ class BSplineBasisCentered(BSplineBasis):
     def bs(self, value: Array | None) -> Array:
         if value is None:
             return self.value
-        value = np.atleast_1d(np.array(value, dtype=np.float32))
+        value = jnp.atleast_1d(jnp.array(value, dtype=np.float32))
         X = SplineDesign(value, knots=self.knots, order=self.order)
         return (X - self.colmeans) @ self.Z
 
