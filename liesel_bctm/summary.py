@@ -586,7 +586,12 @@ def trafo_csample(
     return ynew
 
 
-def quantile_score(y_true: Array, y_pred_q: Array, tau: Array) -> Array:
+def quantile_score(
+    y_true: Array,
+    y_pred_q: Array,
+    tau: Array,
+    weight_fn: Callable[[Array], Array] = lambda p: p,
+) -> Array:
     """
     Compute the mean pinball loss (quantile score) per MCMC draw and quantile.
 
@@ -630,6 +635,7 @@ def quantile_score(y_true: Array, y_pred_q: Array, tau: Array) -> Array:
         return total / y_true.shape[0]  # (Q,)
 
     quantile_score = 2 * jax.vmap(per_draw)(y_pred_q)  # (M, Q)
+    quantile_score = quantile_score * weight_fn(tau)
 
     return quantile_score
 
@@ -647,6 +653,9 @@ def quantile_score_df(y_true: Array, y_pred_q: Array, tau: Array):
         observation, and quantile level.
     tau : Array
         Array of shape (Q,). Quantile levels in (0, 1).
+    weight_fn
+        A function that can be used to weigh quantiles, producing a quantile-weighted
+        CRPS as described in Gneiting & Ranjan (2011), Eq. 8.
 
     Returns
     -------
@@ -678,7 +687,12 @@ def quantile_score_df(y_true: Array, y_pred_q: Array, tau: Array):
     return quantile_score_df
 
 
-def crps(y_true: Array, y_pred_q: Array, tau: Array):
+def crps(
+    y_true: Array,
+    y_pred_q: Array,
+    tau: Array,
+    weight_fn: Callable[[Array], Array] = lambda p: p,
+):
     """
     Compute the mean continuous ranked probability score (CRPS) over all samples and
     quantile levels.
@@ -692,6 +706,9 @@ def crps(y_true: Array, y_pred_q: Array, tau: Array):
         observation, and quantile level.
     tau : Array
         Array of shape (Q,). Quantile levels in (0, 1).
+    weight_fn
+        A function that can be used to weigh quantiles, producing a quantile-weighted
+        CRPS as described in Gneiting & Ranjan (2011), Eq. 8.
 
     Returns
     -------
@@ -703,8 +720,16 @@ def crps(y_true: Array, y_pred_q: Array, tau: Array):
     - Uses `quantile_score` to compute the pinball loss for each chain, sample, and
       quantile level.
     - Returns the mean value over all dimensions of the quantile score array.
+
+    References
+    ----------
+
+    Gneiting, T., & Ranjan, R. (2011). Comparing Density Forecasts Using Threshold- and
+    Quantile-Weighted Scoring Rules. Journal of Business & Economic Statistics, 29(3),
+    411–422. https://doi.org/10.1198/jbes.2010.08110
+
     """
-    qs = quantile_score(y_true, y_pred_q, tau)
+    qs = quantile_score(y_true, y_pred_q, tau, weight_fn=weight_fn)
     return qs.mean()
 
 
