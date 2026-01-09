@@ -17,7 +17,7 @@ classifiers = [
 ]
 
 
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "liesel>=0.4",
     "scikit-learn"
