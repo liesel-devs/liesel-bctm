@@ -590,7 +590,7 @@ def quantile_score(
     y_true: Array,
     y_pred_q: Array,
     tau: Array,
-    weight_fn: Callable[[Array], Array] = lambda p: p,
+    weight_fn: Callable[[Array], Array] = lambda p: jnp.ones_like(p),
 ) -> Array:
     """
     Compute the mean pinball loss (quantile score) per MCMC draw and quantile.
@@ -691,7 +691,7 @@ def crps(
     y_true: Array,
     y_pred_q: Array,
     tau: Array,
-    weight_fn: Callable[[Array], Array] = lambda p: p,
+    weight_fn: Callable[[Array], Array] = lambda p: jnp.ones_like(p),
 ):
     """
     Compute the mean continuous ranked probability score (CRPS) over all samples and
